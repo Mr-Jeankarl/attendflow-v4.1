@@ -278,8 +278,8 @@ export const updateOrganizationName = async (newName) => {
   if (!user) throw new Error('Non authentifié');
 
   try {
-    const isOwner = await isUserOwner(user.uid);
-    if (!isOwner) throw new Error('Seul le chef principal peut modifier le nom');
+    const isAdmin = await isUserAdmin(user.uid);
+    if (!isAdmin) throw new Error('Seul un administrateur peut modifier le nom');
 
     const nameRef = ref(database, 'organization/info/name');
     await set(nameRef, newName);

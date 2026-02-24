@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import * as XLSX from 'xlsx';
 import { onAuthStateChanged } from 'firebase/auth';
-import { ref, get } from 'firebase/database';
+import { ref, get, set } from 'firebase/database';
 import { auth, database } from './firebase/config';
 import { signOut, updateUserProfile } from './firebase/auth';
 import {
@@ -170,7 +170,21 @@ function App() {
           try {
             const userRef = ref(database, `users/${user.uid}/hasOrganization`);
             const snapshot = await get(userRef);
-            const hasOrg = snapshot.exists() && snapshot.val() === true;
+            let hasOrg = snapshot.exists() && snapshot.val() === true;
+
+            // --- AUTO-DETECT / SELF-HEALING ---
+            // Si le flag est false, on vérifie si l'utilisateur est présent dans la liste des admins de l'organisation unique
+            if (!hasOrg) {
+              const adminRef = ref(database, `organization/admins/${user.uid}`);
+              const adminSnapshot = await get(adminRef);
+              if (adminSnapshot.exists()) {
+                console.log("🛠️ Auto-détection: Utilisateur trouvé dans la liste des admins. Réparation du compte...");
+                hasOrg = true;
+                // Réparer le flag dans la DB pour la prochaine fois
+                set(userRef, true);
+              }
+            }
+
             setHasOrganization(hasOrg);
 
             // Si en ligne et a une organisation, tenter une sync immédiate
@@ -1330,7 +1344,8 @@ function App() {
                     )}</p>
                     <p><strong>Code d'invitation :</strong> {organization?.info?.inviteCode}</p>
                   </div>
-                  {isOwner && (
+                  {/* N'importe quel admin peut modifier le nom */}
+                  {(isOwner || organization?.admins?.[currentUser?.uid]?.role === 'admin') && (
                     <div className="item-actions">
                       {isEditingOrgName ? (
                         <>
