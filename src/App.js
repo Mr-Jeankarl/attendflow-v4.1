@@ -10,7 +10,6 @@ import { auth, database } from './firebase/config';
 import { signOut, updateUserProfile } from './firebase/auth';
 import {
   subscribeToOrganization,
-  removeAdmin,
   updateOrganizationName,
   deleteOrganization,
   addMember,

@@ -248,7 +248,7 @@ export const watchOnlineStatus = (onStatusChange) => {
   };
 };
 
-export default {
+const offlineUtils = {
   checkOnlineStatus,
   addToOfflineQueue,
   getOfflineQueue,
@@ -260,3 +260,5 @@ export default {
   syncOfflineActions,
   watchOnlineStatus
 };
+
+export default offlineUtils;
