@@ -200,13 +200,29 @@ const AuthScreen = ({ onAuthSuccess, isOnline }) => {
             </div>
           )}
 
-          <button
-            type="submit"
-            className="btn-primary btn-large"
-            disabled={loading || !isOnline}
-          >
-            {loading ? '⏳ Chargement...' : (!isOnline ? 'Internet requis' : (isLogin ? 'Se connecter' : 'Créer mon compte'))}
-          </button>
+          <div className="auth-form-actions">
+            {!isLogin || authMethod !== 'code' ? (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setIsLogin(true);
+                  setAuthMethod('code');
+                  resetForm();
+                }}
+              >
+                ← Retour
+              </button>
+            ) : null}
+
+            <button
+              type="submit"
+              className={`btn-primary ${isLogin && authMethod === 'code' ? 'btn-large' : ''}`}
+              disabled={loading || !isOnline}
+            >
+              {loading ? '⏳ Chargement...' : (!isOnline ? 'Internet requis' : (isLogin ? 'Se connecter' : 'Créer mon compte'))}
+            </button>
+          </div>
         </form>
 
         <div className="auth-footer">

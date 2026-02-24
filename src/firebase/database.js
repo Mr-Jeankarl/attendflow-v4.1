@@ -301,17 +301,9 @@ export const deleteOrganization = async () => {
     const isOwner = await isUserOwner(user.uid);
     if (!isOwner) throw new Error('Seul le chef principal peut supprimer l\'organisation');
 
-    // Récupérer les IDs de tous les admins pour réinitialiser leur statut
-    const adminsRef = ref(database, 'organization/admins');
-    const snapshot = await get(adminsRef);
-
-    if (snapshot.exists()) {
-      const admins = snapshot.val();
-      const promises = Object.keys(admins).map(adminId =>
-        set(ref(database, `users/${adminId}/hasOrganization`), false)
-      );
-      await Promise.all(promises);
-    }
+    // Mettre à jour le statut "hasOrganization" uniquement pour l'utilisateur courant
+    // Les autres admins seront redirigés automatiquement car orgRef deviendra null (écouté via subscribeToOrganization)
+    await set(ref(database, `users/${user.uid}/hasOrganization`), false);
 
     // Supprimer l'organisation entière
     const orgRef = ref(database, 'organization');

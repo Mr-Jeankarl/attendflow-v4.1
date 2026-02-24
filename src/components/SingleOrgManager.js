@@ -24,7 +24,7 @@ const SingleOrgManager = ({ onOrgReady }) => {
   const checkIfOrgExists = async () => {
     try {
       const exists = await checkOrganizationExists();
-      
+
       if (exists) {
         // L'organisation existe déjà, demander le code
         setView('join');
@@ -165,7 +165,7 @@ const SingleOrgManager = ({ onOrgReady }) => {
         <div className="org-form-container">
           <h2>🎵 Rejoindre AttendFlow</h2>
           <p style={{ textAlign: 'center', color: '#9ca3af', marginBottom: '30px' }}>
-            Une organisation existe déjà. Entrez le code d'invitation pour la rejoindre.
+            Veuillez entrer votre code d'invitation s'il vous plaît.
           </p>
 
           <form onSubmit={handleJoinOrg}>
@@ -195,6 +195,17 @@ const SingleOrgManager = ({ onOrgReady }) => {
             >
               {loading ? 'Vérification...' : 'Rejoindre l\'organisation'}
             </button>
+
+            {onSignOut && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={onSignOut}
+                style={{ width: '100%', marginTop: '15px' }}
+              >
+                ← Retour / Déconnexion
+              </button>
+            )}
           </form>
         </div>
       </div>

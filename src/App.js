@@ -241,6 +241,12 @@ function App() {
 
           // Mettre en cache pour le mode offline
           cacheOrganization('single_org', orgData);
+        } else {
+          // L'organisation a été supprimée ou n'existe pas
+          setOrganization(null);
+          setHasOrganization(false);
+          setMembers([]);
+          setSessions([]);
         }
       });
       return unsubscribe;
@@ -315,8 +321,8 @@ function App() {
     setCurrentView('home');
   };
 
-  const handleSignOut = async () => {
-    const confirm = window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?');
+  const handleSignOut = async (noConfirm = false) => {
+    const confirm = noConfirm || window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?');
     if (confirm) {
       try {
         await signOut();
@@ -924,7 +930,7 @@ function App() {
 
   // Authentifié mais pas d'organisation : configuration organisation
   if (!hasOrganization) {
-    return <SingleOrgManager onOrgReady={handleOrgReady} />;
+    return <SingleOrgManager onOrgReady={handleOrgReady} onSignOut={() => handleSignOut(true)} />;
   }
 
   // Application principale
@@ -1028,7 +1034,12 @@ function App() {
         {/* Vue Nouvelle Session */}
         {currentView === 'newSession' && (
           <div className="session-view">
-            <h2>Nouvelle session</h2>
+            <div className="view-header">
+              <button onClick={() => setCurrentView('home')} className="btn-back">
+                ← Retour
+              </button>
+              <h2>Nouvelle session</h2>
+            </div>
             <div className="session-form">
               <div className="form-group">
                 <label>Type d'activité <span className="required">*</span> :</label>
