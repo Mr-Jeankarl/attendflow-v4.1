@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { checkOrganizationExists, createOrganization, joinOrganization } from '../firebase/database';
 
-const SingleOrgManager = ({ onOrgReady }) => {
+const SingleOrgManager = ({ onOrgReady, onSignOut }) => {
   const [view, setView] = useState('loading'); // 'loading', 'create', 'join'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
