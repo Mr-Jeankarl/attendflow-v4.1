@@ -2,7 +2,8 @@
 // Gestion des opérations CRUD avec Firebase Realtime Database
 
 import { ref, set, get, update, remove, push, onValue } from 'firebase/database';
-import { database, auth } from './config';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { database, auth, storage } from './config';
 
 // ==========================================
 // GESTION DES ORGANISATIONS
@@ -479,6 +480,151 @@ export const isUserOwner = async (userId = null) => {
   }
 };
 
+// ==========================================
+// GESTION DU REPERTOIRE (CHANTS)
+// ==========================================
+
+/**
+ * Uploader un fichier pour un chant (PDF ou Audio)
+ */
+export const uploadSongFile = async (songId, fileType, file) => {
+  if (!file) return null;
+  try {
+    const fileRef = storageRef(storage, `organization/repertoire/${songId}/${fileType}_${file.name}`);
+    await uploadBytes(fileRef, file);
+    const downloadURL = await getDownloadURL(fileRef);
+    return downloadURL;
+  } catch (error) {
+    console.error(`Erreur d'upload pour le type ${fileType}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Ajouter un chant au répertoire
+ */
+export const addSong = async (songData) => {
+  try {
+    const songRef = push(ref(database, 'organization/repertoire'));
+    const songId = songRef.key;
+
+    const song = {
+      id: songId,
+      title: songData.title,
+      pdfUrl: songData.pdfUrl || '',
+      audioUrl: songData.audioUrl || '',
+      pupitresAudio: songData.pupitresAudio || {},
+      createdAt: new Date().toISOString(),
+      createdBy: auth.currentUser?.uid || 'system'
+    };
+
+    await set(songRef, song);
+    return { songId, song };
+  } catch (error) {
+    console.error('Erreur ajout chant:', error);
+    throw error;
+  }
+};
+
+/**
+ * Mettre à jour un chant
+ */
+export const updateSong = async (songId, updates) => {
+  try {
+    const songRef = ref(database, `organization/repertoire/${songId}`);
+    await update(songRef, updates);
+    return true;
+  } catch (error) {
+    console.error('Erreur mise à jour chant:', error);
+    throw error;
+  }
+};
+
+/**
+ * Supprimer un chant et ses fichiers associés du Storage
+ */
+export const deleteSong = async (songId, songData = null) => {
+  try {
+    if (songData) {
+      const pathsToDelete = [];
+      if (songData.pdfUrl && songData.pdfUrl.includes('firebasestorage')) pathsToDelete.push(songData.pdfUrl);
+      if (songData.audioUrl && songData.audioUrl.includes('firebasestorage')) pathsToDelete.push(songData.audioUrl);
+      if (songData.pupitresAudio) {
+        Object.values(songData.pupitresAudio).forEach(url => {
+          if (url && url.includes('firebasestorage')) pathsToDelete.push(url);
+        });
+      }
+
+      for (const url of pathsToDelete) {
+        try {
+          const fileRef = storageRef(storage, url);
+          await deleteObject(fileRef);
+        } catch (e) {
+          console.warn('Erreur suppression fichier storage (ignorée):', e);
+        }
+      }
+    }
+
+    const songRef = ref(database, `organization/repertoire/${songId}`);
+    await remove(songRef);
+    return true;
+  } catch (error) {
+    console.error('Erreur suppression chant:', error);
+    throw error;
+  }
+};
+
+// ==========================================
+// GESTION DU THÈME ET FONDS D'ÉCRAN
+// ==========================================
+
+/**
+ * Uploader un fond d'écran personnalisé pour l'organisation
+ */
+export const uploadCustomBackground = async (themeType, file) => {
+  if (!file) return null;
+  const user = auth.currentUser;
+  if (!user) throw new Error('Non authentifié');
+  
+  try {
+    const fileRef = storageRef(storage, `organization/theme/customBg_${themeType}`);
+    await uploadBytes(fileRef, file);
+    const downloadURL = await getDownloadURL(fileRef);
+    
+    const dbRef = ref(database, `organization/info/customBg_${themeType}`);
+    await set(dbRef, downloadURL);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error(`Erreur d'upload du fond d'écran ${themeType}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Supprimer un fond d'écran personnalisé pour l'organisation
+ */
+export const removeCustomBackground = async (themeType) => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Non authentifié');
+  
+  try {
+    try {
+      const fileRef = storageRef(storage, `organization/theme/customBg_${themeType}`);
+      await deleteObject(fileRef);
+    } catch (e) {
+      console.warn('Erreur suppression storage (fond d\'écran):', e);
+    }
+    
+    const dbRef = ref(database, `organization/info/customBg_${themeType}`);
+    await remove(dbRef);
+    return true;
+  } catch (error) {
+    console.error(`Erreur de suppression du fond d'écran ${themeType}:`, error);
+    throw error;
+  }
+};
+
 const databaseService = {
   createOrganization,
   joinOrganization,
@@ -495,7 +641,13 @@ const databaseService = {
   updateSession,
   deleteSession,
   isUserAdmin,
-  isUserOwner
+  isUserOwner,
+  uploadSongFile,
+  addSong,
+  updateSong,
+  deleteSong,
+  uploadCustomBackground,
+  removeCustomBackground
 };
 
 export default databaseService;

@@ -1,69 +1,130 @@
 // src/App.js
-// Application principale AttendFlow V4.0 avec Firebase
+// Application principale AttendFlow V4.1 avec Firebase + Mode Démo
 
 import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import * as XLSX from 'xlsx';
-import { onAuthStateChanged } from 'firebase/auth';
-import { ref, get, set } from 'firebase/database';
-import { auth, database } from './firebase/config';
-import { signOut, updateUserProfile } from './firebase/auth';
-import {
-  subscribeToOrganization,
-  updateOrganizationName,
-  deleteOrganization,
-  addMember,
-  updateMember,
-  deleteMember,
-  createSession,
-  updateSession,
-  deleteSession,
-  isUserOwner
-} from './firebase/database';
-import {
-  checkOnlineStatus,
-  watchOnlineStatus,
-  syncOfflineActions,
-  cacheOrganization,
-  getCachedOrganization,
-  addToOfflineQueue
-} from './firebase/offline';
-import {
-  requestNotificationPermission,
-  onMessageListener,
-  notifyNewSession
-} from './firebase/notifications';
+import { isDemoMode, auth, database } from './firebase/config';
+import { DEMO_ORGANIZATION, DEMO_USER } from './firebase/demoData';
 
 // Composants
 import AuthScreen from './components/AuthScreen';
 import SingleOrgManager from './components/SingleOrgManager';
 import ConnectionStatus from './components/ConnectionStatus';
 import AdminManager from './components/AdminManager';
+import RepertoireView from './components/RepertoireView';
+
+// Firebase imports – safe stubs when in demo mode
+// (Using require() for conditional loading – ESLint-compliant because
+//  static `import` statements are ALL above this line)
+/* eslint-disable import/first */
+let onAuthStateChanged_fn = () => () => {};
+let ref_fn = () => ({});
+let get_fn = async () => ({ exists: () => false, val: () => null });
+let set_fn = async () => {};
+
+let signOut_fn = async () => {};
+let updateUserProfile_fn = async () => {};
+
+let subscribeToOrganization_fn = () => () => {};
+let updateOrganizationName_fn = async () => {};
+let deleteOrganization_fn = async () => {};
+let addMember_fn = async () => {};
+let updateMember_fn = async () => {};
+let deleteMember_fn = async () => {};
+let createSession_fn = async () => ({});
+let updateSession_fn = async () => {};
+let deleteSession_fn = async () => {};
+let isUserOwner_fn = async () => true;
+let addSong_fn = async () => {};
+let updateSong_fn = async () => {};
+let deleteSong_fn = async () => {};
+let uploadCustomBackground_fn = async () => {};
+let removeCustomBackground_fn = async () => {};
+
+let checkOnlineStatus_fn = () => true;
+let watchOnlineStatus_fn = () => () => {};
+let syncOfflineActions_fn = async () => ({ synced: 0 });
+let cacheOrganization_fn = () => {};
+let getCachedOrganization_fn = () => null;
+let addToOfflineQueue_fn = () => {};
+
+let requestNotificationPermission_fn = async () => null;
+let onMessageListener_fn = () => () => {};
+let notifyNewSession_fn = async () => {};
+
+if (!isDemoMode) {
+  // Only load real Firebase modules when credentials are available
+  const fbAuth = require('firebase/auth');
+  const fbDb = require('firebase/database');
+  const authModule = require('./firebase/auth');
+  const dbModule = require('./firebase/database');
+  const offlineModule = require('./firebase/offline');
+  const notifModule = require('./firebase/notifications');
+
+  onAuthStateChanged_fn = fbAuth.onAuthStateChanged;
+  ref_fn = fbDb.ref;
+  get_fn = fbDb.get;
+  set_fn = fbDb.set;
+
+  signOut_fn = authModule.signOut;
+  updateUserProfile_fn = authModule.updateUserProfile;
+
+  subscribeToOrganization_fn = dbModule.subscribeToOrganization;
+  updateOrganizationName_fn = dbModule.updateOrganizationName;
+  deleteOrganization_fn = dbModule.deleteOrganization;
+  addMember_fn = dbModule.addMember;
+  updateMember_fn = dbModule.updateMember;
+  deleteMember_fn = dbModule.deleteMember;
+  createSession_fn = dbModule.createSession;
+  updateSession_fn = dbModule.updateSession;
+  deleteSession_fn = dbModule.deleteSession;
+  isUserOwner_fn = dbModule.isUserOwner;
+  addSong_fn = dbModule.addSong;
+  updateSong_fn = dbModule.updateSong;
+  deleteSong_fn = dbModule.deleteSong;
+  uploadCustomBackground_fn = dbModule.uploadCustomBackground;
+  removeCustomBackground_fn = dbModule.removeCustomBackground;
+
+  checkOnlineStatus_fn = offlineModule.checkOnlineStatus;
+  watchOnlineStatus_fn = offlineModule.watchOnlineStatus;
+  syncOfflineActions_fn = offlineModule.syncOfflineActions;
+  cacheOrganization_fn = offlineModule.cacheOrganization;
+  getCachedOrganization_fn = offlineModule.getCachedOrganization;
+  addToOfflineQueue_fn = offlineModule.addToOfflineQueue;
+
+  requestNotificationPermission_fn = notifModule.requestNotificationPermission;
+  onMessageListener_fn = notifModule.onMessageListener;
+  notifyNewSession_fn = notifModule.notifyNewSession;
+}
+/* eslint-enable import/first */
 
 // Liste des catégories/pupitres
 const PUPITRES = ['Soprano', 'Alto', 'Ténor', 'Basse', 'Instrumentistes', 'Maître de chœur'];
 
+
 function App() {
   // États d'authentification et organisation
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [hasOrganization, setHasOrganization] = useState(false);
-  const [organization, setOrganization] = useState(null);
-  const [isOwner, setIsOwner] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(isDemoMode);
+  const [currentUser, setCurrentUser] = useState(isDemoMode ? DEMO_USER : null);
+  const [hasOrganization, setHasOrganization] = useState(true); // Forced to true for single org
+  const [organization, setOrganization] = useState(isDemoMode ? DEMO_ORGANIZATION : null);
+  const [isOwner, setIsOwner] = useState(isDemoMode);
+  const [loading, setLoading] = useState(!isDemoMode);
 
   // États de connexion
-  const [isOnline, setIsOnline] = useState(checkOnlineStatus());
+  const [isOnline, setIsOnline] = useState(checkOnlineStatus_fn());
   const [isSyncing, setIsSyncing] = useState(false);
 
   // États de navigation
   const [currentView, setCurrentView] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
 
   // États pour les données
-  const [members, setMembers] = useState([]);
-  const [sessions, setSessions] = useState([]);
+  const [members, setMembers] = useState(isDemoMode ? Object.values(DEMO_ORGANIZATION.members) : []);
+  const [sessions, setSessions] = useState(isDemoMode ? Object.values(DEMO_ORGANIZATION.sessions) : []);
   const [selectedSession, setSelectedSession] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
@@ -114,12 +175,12 @@ function App() {
   // ==========================================
 
   const handleSync = useCallback(async () => {
-    if (!hasOrganization || !isOnline) return;
+    if (isDemoMode || !hasOrganization || !isOnline) return;
 
     setIsSyncing(true);
     try {
-      const result = await syncOfflineActions(
-        { addMember, updateMember, deleteMember, createSession, updateSession, deleteSession }
+      const result = await syncOfflineActions_fn(
+        { addMember: addMember_fn, updateMember: updateMember_fn, deleteMember: deleteMember_fn, createSession: createSession_fn, updateSession: updateSession_fn, deleteSession: deleteSession_fn, addSong: addSong_fn, updateSong: updateSong_fn, deleteSong: deleteSong_fn }
       );
 
       if (result.synced > 0 || result.success) {
@@ -131,14 +192,14 @@ function App() {
 
         // Forcer une récupération des données fraîches depuis Firebase
         if (isOnline) {
-          const orgRef = ref(database, 'organization');
-          const snapshot = await get(orgRef);
+          const orgRef = ref_fn(database, 'organization');
+          const snapshot = await get_fn(orgRef);
           if (snapshot.exists()) {
             const orgData = snapshot.val();
             setOrganization(orgData);
             setMembers(Object.values(orgData.members || {}));
             setSessions(Object.values(orgData.sessions || {}));
-            cacheOrganization('single_org', orgData);
+            cacheOrganization_fn('single_org', orgData);
           }
         }
       }
@@ -151,6 +212,8 @@ function App() {
 
   // Surveillance de l'authentification
   useEffect(() => {
+    if (isDemoMode) return; // Skip in demo mode – state already set
+
     // Timeout de sécurité pour le chargement (max 10s)
     const loadingTimeout = setTimeout(() => {
       if (loading) {
@@ -159,7 +222,7 @@ function App() {
       }
     }, 10000);
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged_fn(auth, async (user) => {
       try {
         if (user) {
           setIsAuthenticated(true);
@@ -168,24 +231,23 @@ function App() {
 
           // Vérifier si l'utilisateur a une organisation
           try {
-            const userRef = ref(database, `users/${user.uid}/hasOrganization`);
-            const snapshot = await get(userRef);
+            const userRef = ref_fn(database, `users/${user.uid}/hasOrganization`);
+            const snapshot = await get_fn(userRef);
             let hasOrg = snapshot.exists() && snapshot.val() === true;
 
             // --- AUTO-DETECT / SELF-HEALING ---
-            // Si le flag est false, on vérifie si l'utilisateur est présent dans la liste des admins de l'organisation unique
             if (!hasOrg) {
-              const adminRef = ref(database, `organization/admins/${user.uid}`);
-              const adminSnapshot = await get(adminRef);
+              const adminRef = ref_fn(database, `organization/admins/${user.uid}`);
+              const adminSnapshot = await get_fn(adminRef);
               if (adminSnapshot.exists()) {
                 console.log("🛠️ Auto-détection: Utilisateur trouvé dans la liste des admins. Réparation du compte...");
                 hasOrg = true;
-                // Réparer le flag dans la DB pour la prochaine fois
-                set(userRef, true);
+                set_fn(userRef, true);
               }
             }
 
-            setHasOrganization(hasOrg);
+            // Forced single org: always has an org
+            setHasOrganization(true);
 
             // Si en ligne et a une organisation, tenter une sync immédiate
             if (hasOrg && navigator.onLine) {
@@ -193,8 +255,7 @@ function App() {
             }
           } catch (dbError) {
             console.error('Erreur lecture DB (init):', dbError);
-            // En cas d'erreur DB (offline probable), essayer de charger depuis le cache global
-            const cachedOrg = getCachedOrganization('single_org');
+            const cachedOrg = getCachedOrganization_fn('single_org');
             if (cachedOrg) {
               setHasOrganization(true);
             }
@@ -221,7 +282,8 @@ function App() {
 
   // Surveillance du statut de connexion
   useEffect(() => {
-    const unwatch = watchOnlineStatus((online) => {
+    if (isDemoMode) return;
+    const unwatch = watchOnlineStatus_fn((online) => {
       setIsOnline(online);
 
       if (online && hasOrganization) {
@@ -234,11 +296,11 @@ function App() {
 
   // Synchronisation en temps réel de l'organisation
   useEffect(() => {
-    if (!hasOrganization) return;
+    if (!hasOrganization || isDemoMode) return;
 
     if (isOnline) {
       // Mode online : écouter Firebase
-      const unsubscribe = subscribeToOrganization((orgData) => {
+      const unsubscribe = subscribeToOrganization_fn((orgData) => {
         if (orgData) {
           setOrganization(orgData);
 
@@ -254,11 +316,10 @@ function App() {
           setSessions(allSessions);
 
           // Mettre en cache pour le mode offline
-          cacheOrganization('single_org', orgData);
+          cacheOrganization_fn('single_org', orgData);
         } else {
-          // L'organisation a été supprimée ou n'existe pas
-          setOrganization(null);
-          setHasOrganization(false);
+          setOrganization(prev => prev || { info: { name: "Grand Chœur Polyphonique de Bobo-Dioulasso" } });
+          setHasOrganization(true);
           setMembers([]);
           setSessions([]);
         }
@@ -266,7 +327,7 @@ function App() {
       return unsubscribe;
     } else {
       // Mode offline : charger depuis le cache + localStorage
-      const cachedData = getCachedOrganization('single_org');
+      const cachedData = getCachedOrganization_fn('single_org');
       if (cachedData) {
         setOrganization(cachedData);
 
@@ -291,9 +352,10 @@ function App() {
 
   // Vérifier si l'utilisateur est owner
   useEffect(() => {
+    if (isDemoMode) return; // Already set to true
     const checkOwner = async () => {
       if (hasOrganization && currentUser) {
-        const owner = await isUserOwner(currentUser.uid);
+        const owner = await isUserOwner_fn(currentUser.uid);
         setIsOwner(owner);
       }
     };
@@ -302,17 +364,18 @@ function App() {
 
   // Demander permission pour les notifications
   useEffect(() => {
+    if (isDemoMode) return;
     if (isAuthenticated && isOnline) {
-      requestNotificationPermission();
+      requestNotificationPermission_fn();
     }
   }, [isAuthenticated, isOnline]);
 
   // Écouter les notifications en temps réel
   useEffect(() => {
+    if (isDemoMode) return;
     if (isAuthenticated) {
-      const unsubscribe = onMessageListener((payload) => {
+      const unsubscribe = onMessageListener_fn((payload) => {
         console.log('Notification reçue:', payload);
-        // Rafraîchir les données si nécessaire
         if (payload.data?.type === 'new_session') {
           // Les données sont déjà synchronisées via subscribeToOrganization
         }
@@ -339,7 +402,7 @@ function App() {
     const confirm = noConfirm || window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?');
     if (confirm) {
       try {
-        await signOut();
+        await signOut_fn();
         setIsAuthenticated(false);
         setCurrentUser(null);
         setHasOrganization(false);
@@ -353,7 +416,7 @@ function App() {
   const handleUpdateOrgName = async () => {
     if (!tempOrgName.trim()) return;
     try {
-      await updateOrganizationName(tempOrgName);
+      await updateOrganizationName_fn(tempOrgName);
       setIsEditingOrgName(false);
       alert('Nom de l\'organisation mis à jour !');
     } catch (error) {
@@ -363,7 +426,7 @@ function App() {
 
   const handleDeleteOrg = async () => {
     try {
-      await deleteOrganization();
+      await deleteOrganization_fn();
       alert('Organisation supprimée avec succès.');
       window.location.reload(); // Recharger pour réinitialiser l'état global
     } catch (error) {
@@ -374,7 +437,7 @@ function App() {
   const handleUpdateProfile = async () => {
     if (!tempDisplayName.trim()) return;
     try {
-      await updateUserProfile({
+      await updateUserProfile_fn({
         name: tempDisplayName,
         photoURL: profileImage // Inclure la photo dans la sync Firebase
       });
@@ -421,9 +484,10 @@ function App() {
         createdAt: new Date().toISOString()
       };
 
-      if (isOnline) {
-        // Mode online : envoyer à Firebase
-        await addMember(newMember);
+      if (isDemoMode || isOnline) {
+        if (!isDemoMode) await addMember_fn(newMember);
+        // In demo: add directly to state
+        setMembers(prev => [...prev, { ...newMember, id: 'demo_' + Date.now(), createdAt: new Date().toISOString() }]);
         alert('✅ Membre ajouté avec succès !');
       } else {
         // Mode offline : ajouter immédiatement à la liste locale
@@ -435,7 +499,7 @@ function App() {
         localStorage.setItem('offline_members', JSON.stringify(offlineMembers));
 
         // Ajouter à la queue pour sync future
-        addToOfflineQueue({
+        addToOfflineQueue_fn({
           type: 'ADD_MEMBER',
           data: newMember,
           tempId: memberWithId.id,
@@ -462,10 +526,10 @@ function App() {
   const handleUpdateMember = async (updatedMember) => {
     try {
       if (isOnline) {
-        await updateMember(updatedMember.id, updatedMember);
+        await updateMember_fn(updatedMember.id, updatedMember);
         alert('✅ Informations mises à jour !');
       } else {
-        addToOfflineQueue({
+        addToOfflineQueue_fn({
           type: 'UPDATE_MEMBER',
           memberId: updatedMember.id,
           data: updatedMember,
@@ -492,10 +556,10 @@ function App() {
 
     try {
       if (isOnline) {
-        await deleteMember(memberId);
+        await deleteMember_fn(memberId);
         alert(`✅ "${memberName}" a été supprimé.`);
       } else {
-        addToOfflineQueue({
+        addToOfflineQueue_fn({
           type: 'DELETE_MEMBER',
           memberId: memberId,
           id: Date.now().toString()
@@ -520,6 +584,10 @@ function App() {
   // ==========================================
 
   const startNewSession = () => {
+    if (!isAdmin) {
+      alert("vous n'êtes pas autorisé à effectuer cette action.");
+      return;
+    }
     setCurrentView('newSession');
     setNewSession({
       activityName: '',
@@ -601,12 +669,21 @@ function App() {
     };
 
     try {
-      if (isOnline) {
-        const result = await createSession(sessionData);
-
-        // Envoyer notification aux autres admins
-        await notifyNewSession(result.session);
-
+      if (isDemoMode || isOnline) {
+        // Demo mode: save locally; online mode: save to Firebase
+        const sessionWithId = {
+          ...sessionData,
+          id: (isDemoMode ? 'demo_' : 'sess_') + Date.now(),
+          createdBy: currentUser?.uid || 'demo_user',
+          createdByName: currentUser?.displayName || 'Démo',
+          createdAt: new Date().toISOString()
+        };
+        if (!isDemoMode) {
+          const result = await createSession_fn(sessionData);
+          await notifyNewSession_fn(result.session);
+        } else {
+          setSessions(prev => [...prev, sessionWithId]);
+        }
         alert('✅ Session enregistrée avec succès !');
       } else {
         // Mode offline : ajouter immédiatement à la liste locale
@@ -626,7 +703,7 @@ function App() {
         localStorage.setItem('offline_sessions', JSON.stringify(offlineSessions));
 
         // Ajouter à la queue
-        addToOfflineQueue({
+        addToOfflineQueue_fn({
           type: 'CREATE_SESSION',
           data: sessionData,
           tempId: sessionWithId.id,
@@ -650,13 +727,107 @@ function App() {
   };
 
   // ==========================================
+  // FONCTIONS - Thème et Répertoire
+  // ==========================================
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
+
+  const handleAddSong = async (songData) => {
+    try {
+      // Update local org state (demo: only local; online: Firebase will sync back)
+      const tempId = songData.id || ('song_' + Date.now());
+      const currentRepertoire = organization?.repertoire || {};
+      const updatedRepertoire = { ...currentRepertoire, [tempId]: { ...songData, id: tempId } };
+      const updatedOrg = { ...organization, repertoire: updatedRepertoire };
+      setOrganization(updatedOrg);
+
+      if (!isDemoMode && isOnline) {
+        await addSong_fn(songData);
+      } else if (!isDemoMode) {
+        cacheOrganization_fn('single_org', updatedOrg);
+        addToOfflineQueue_fn({ type: 'ADD_SONG', data: songData, tempId, id: Date.now().toString() });
+        alert('✅ Chant enregistré hors-ligne (sera synchronisé) !');
+      }
+    } catch (err) {
+      alert('Erreur lors de l\'ajout du chant : ' + err.message);
+    }
+  };
+
+  const handleUpdateSong = async (songId, songData) => {
+    try {
+      const currentRepertoire = organization?.repertoire || {};
+      const updatedRepertoire = { ...currentRepertoire, [songId]: songData };
+      const updatedOrg = { ...organization, repertoire: updatedRepertoire };
+      setOrganization(updatedOrg);
+
+      if (!isDemoMode && isOnline) {
+        await updateSong_fn(songId, songData);
+      } else if (!isDemoMode) {
+        cacheOrganization_fn('single_org', updatedOrg);
+        addToOfflineQueue_fn({ type: 'UPDATE_SONG', songId, data: songData, id: Date.now().toString() });
+        alert('✅ Modification enregistrée hors-ligne (sera synchronisée) !');
+      }
+    } catch (err) {
+      alert('Erreur lors de la modification : ' + err.message);
+    }
+  };
+
+  const handleDeleteSong = async (songId, songData) => {
+    try {
+      const currentRepertoire = organization?.repertoire || {};
+      const updatedRepertoire = { ...currentRepertoire };
+      delete updatedRepertoire[songId];
+      const updatedOrg = { ...organization, repertoire: updatedRepertoire };
+      setOrganization(updatedOrg);
+
+      if (!isDemoMode && isOnline) {
+        await deleteSong_fn(songId, songData);
+      } else if (!isDemoMode) {
+        cacheOrganization_fn('single_org', updatedOrg);
+        addToOfflineQueue_fn({ type: 'DELETE_SONG', songId, data: songData, id: Date.now().toString() });
+        alert('✅ Suppression enregistrée hors-ligne (sera synchronisée) !');
+      }
+    } catch (err) {
+      alert('Erreur lors de la suppression : ' + err.message);
+    }
+  };
+
+  const handleUploadBackground = async (themeType, file) => {
+    if (!file) return;
+    if (isDemoMode) { alert('⚠️ Fond d\'écran non disponible en mode démo.'); return; }
+    try {
+      const url = await uploadCustomBackground_fn(themeType, file);
+      alert(`✅ Fond d'écran ${themeType === 'dark' ? 'sombre' : 'clair'} mis à jour !`);
+      return url;
+    } catch (error) {
+      alert('Erreur lors du téléversement : ' + error.message);
+    }
+  };
+
+  const handleRemoveBackground = async (themeType) => {
+    const confirm = window.confirm(`Supprimer le fond d'écran personnalisé (${themeType === 'dark' ? 'sombre' : 'clair'}) ?`);
+    if (!confirm) return;
+    if (isDemoMode) { alert('⚠️ Non disponible en mode démo.'); return; }
+    try {
+      await removeCustomBackground_fn(themeType);
+      alert(`✅ Fond d'écran ${themeType === 'dark' ? 'sombre' : 'clair'} supprimé !`);
+    } catch (error) {
+      alert('Erreur lors de la suppression : ' + error.message);
+    }
+  };
+
+  // ==========================================
   // FONCTIONS - Export
   // ==========================================
 
   const exportToExcel = () => {
     const data = [];
 
-    data.push(['Historique des présences - ' + (organization?.info?.name || 'Organisation')]);
+    data.push(['Historique des présences - ' + (organization?.info?.name || 'Grand Chœur Polyphonique de Bobo-Dioulasso')]);
     data.push([]);
 
     sessions.forEach(session => {
@@ -713,7 +884,7 @@ function App() {
   };
 
   const exportToPDF = () => {
-    const orgName = organization?.info?.name || 'Organisation';
+    const orgName = organization?.info?.name || 'Grand Chœur Polyphonique de Bobo-Dioulasso';
     let htmlContent = `
       <html>
       <head>
@@ -912,6 +1083,11 @@ function App() {
     return name.substring(0, 2).toUpperCase();
   };
 
+  const isAdmin = isOwner || (organization?.admins?.[currentUser?.uid]?.role === 'admin');
+
+  // Custom background URL for current theme
+  const customBgUrl = organization?.info?.[`customBg_${theme}`];
+
   const timeString = currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const dateString = currentTime.toLocaleDateString('fr-FR', {
     weekday: 'short',
@@ -942,14 +1118,20 @@ function App() {
     return <AuthScreen onAuthSuccess={handleAuthSuccess} isOnline={isOnline} />;
   }
 
-  // Authentifié mais pas d'organisation : configuration organisation
-  if (!hasOrganization) {
-    return <SingleOrgManager onOrgReady={handleOrgReady} onSignOut={() => handleSignOut(true)} />;
-  }
+  // App is now single org by default, bypassing SingleOrgManager
+  // (No 'if (!hasOrganization)' block)
 
   // Application principale
   return (
-    <div className="App">
+    <div className={`App ${theme}-theme`} style={{ backgroundImage: `url(${customBgUrl || `/assets/default_bg_${theme}.png`})` }}>
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <div className="demo-banner">
+          🎭 <strong>MODE DÉMO</strong> — Données fictives · Aucune connexion Firebase requise ·{' '}
+          <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer">Configurer Firebase →</a>
+        </div>
+      )}
+
       {/* Hamburger button */}
       <button
         className="hamburger-btn"
@@ -985,6 +1167,12 @@ function App() {
           Statistiques
         </button>
         <button
+          onClick={() => { setCurrentView('repertoire'); setSidebarOpen(false); }}
+          className={currentView === 'repertoire' ? 'active' : ''}
+        >
+          🎵 Répertoire
+        </button>
+        <button
           onClick={() => { setCurrentView('settings'); setSidebarOpen(false); }}
           className={currentView === 'settings' ? 'active' : ''}
         >
@@ -1006,15 +1194,32 @@ function App() {
               </div>
             )}
           </div>
-          <span className="user-name">{currentUser?.displayName || currentUser?.email || 'Admin'}</span>
+          <div className="welcome-user">
+            <span className="welcome-text">Bienvenu</span>
+            <span className="welcome-name">{currentUser?.displayName || currentUser?.email || 'Admin'}</span>
+          </div>
         </div>
         <div className="header-center">
-          <span className="org-name">{organization?.info?.name || 'Organisation'}</span>
+          <span className="org-name">{organization?.info?.name || 'Grand Chœur Polyphonique de Bobo-Dioulasso'}</span>
         </div>
         <div className="header-right">
-          <ConnectionStatus isOnline={isOnline} pendingSync={isSyncing} />
-          <span className="current-time">{timeString}</span>
-          <span className="current-date">[{dateString}]</span>
+          <div className="header-time-info">
+            <button className="theme-toggle-btn" onClick={toggleTheme} title="Changer le thème">
+              {theme === 'dark' ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              )}
+            </button>
+            <span className="current-time">{timeString}</span>
+            <span className="current-date">[{dateString}]</span>
+          </div>
+          <div className="logo-status-row">
+            <ConnectionStatus isOnline={isOnline} pendingSync={isSyncing} />
+            <div className="logo-box">
+              <span className="logo-text">logo</span>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -1039,9 +1244,14 @@ function App() {
                 <p>sessions enregistrées</p>
               </div>
             </div>
-            <button onClick={startNewSession} className="btn-primary btn-large">
-              ➕ Nouvelle session
-            </button>
+            <div className="home-actions">
+              <button onClick={startNewSession} className="btn-primary btn-large">
+                + nouvelle session
+              </button>
+              <button onClick={() => setCurrentView('repertoire')} className="btn-secondary btn-large">
+                Voir le répertoire
+              </button>
+            </div>
           </div>
         )}
 
@@ -1322,6 +1532,19 @@ function App() {
           </div>
         )}
 
+        {/* Vue Répertoire */}
+        {currentView === 'repertoire' && (
+          <RepertoireView
+            organization={organization}
+            isOnline={isOnline}
+            isAdmin={isAdmin}
+            isOwner={isOwner}
+            onAddSong={handleAddSong}
+            onUpdateSong={handleUpdateSong}
+            onDeleteSong={handleDeleteSong}
+          />
+        )}
+
         {/* Vue Paramètres */}
         {currentView === 'settings' && (
           <div className="settings-view">
@@ -1363,6 +1586,70 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {(isOwner || isAdmin) && (
+              <div className="settings-section">
+                <h3>🎨 Fonds d'écran personnalisés</h3>
+                <div className="settings-card">
+                  <div className="bg-settings-grid">
+                    {/* Fond sombre */}
+                    <div className="bg-setting-card">
+                      <h4>🌙 Thème Sombre</h4>
+                      <div
+                        className="bg-preview-thumbnail"
+                        style={organization?.info?.customBg_dark
+                          ? { backgroundImage: `url(${organization.info.customBg_dark})` }
+                          : {}}
+                      >
+                        {!organization?.info?.customBg_dark && 'Par défaut'}
+                      </div>
+                      <label className="btn-upload-bg">
+                        📤 Choisir une image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={(e) => handleUploadBackground('dark', e.target.files[0])}
+                          disabled={!isOnline}
+                        />
+                      </label>
+                      {organization?.info?.customBg_dark && (
+                        <button onClick={() => handleRemoveBackground('dark')} className="btn-remove-bg" disabled={!isOnline}>
+                          🗑️ Supprimer
+                        </button>
+                      )}
+                    </div>
+                    {/* Fond clair */}
+                    <div className="bg-setting-card">
+                      <h4>☀️ Thème Clair</h4>
+                      <div
+                        className="bg-preview-thumbnail"
+                        style={organization?.info?.customBg_light
+                          ? { backgroundImage: `url(${organization.info.customBg_light})` }
+                          : {}}
+                      >
+                        {!organization?.info?.customBg_light && 'Par défaut'}
+                      </div>
+                      <label className="btn-upload-bg">
+                        📤 Choisir une image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={(e) => handleUploadBackground('light', e.target.files[0])}
+                          disabled={!isOnline}
+                        />
+                      </label>
+                      {organization?.info?.customBg_light && (
+                        <button onClick={() => handleRemoveBackground('light')} className="btn-remove-bg" disabled={!isOnline}>
+                          🗑️ Supprimer
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="settings-section">
               <h3>👤 Mon compte</h3>
@@ -1456,6 +1743,46 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Bottom Navigation Mobile */}
+      <nav className="bottom-nav">
+        <button
+          className={`bottom-nav-item ${currentView === 'home' ? 'active' : ''}`}
+          onClick={() => setCurrentView('home')}
+        >
+          <span className="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+          <span>Accueil</span>
+        </button>
+        <button
+          className={`bottom-nav-item ${currentView === 'members' ? 'active' : ''}`}
+          onClick={() => setCurrentView('members')}
+        >
+          <span className="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+          <span>Membres</span>
+        </button>
+
+        <button
+          className={`bottom-nav-item ${currentView === 'history' ? 'active' : ''}`}
+          onClick={() => setCurrentView('history')}
+        >
+          <span className="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+          <span>Historique</span>
+        </button>
+        <button
+          className={`bottom-nav-item ${currentView === 'stats' ? 'active' : ''}`}
+          onClick={() => setCurrentView('stats')}
+        >
+          <span className="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+          <span>Stats</span>
+        </button>
+        <button
+          className={`bottom-nav-item ${currentView === 'settings' ? 'active' : ''}`}
+          onClick={() => setCurrentView('settings')}
+        >
+          <span className="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <span>Paramètres</span>
+        </button>
+      </nav>
 
       <footer className="app-footer"></footer>
 

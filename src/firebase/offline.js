@@ -201,6 +201,23 @@ export const syncOfflineActions = async (database) => {
           await database.deleteSession(sessionId);
           break;
         }
+        case 'ADD_SONG': {
+          const result = await database.addSong(action.data);
+          if (action.tempId && result.songId) {
+            idMap[action.tempId] = result.songId;
+          }
+          break;
+        }
+        case 'UPDATE_SONG': {
+          const songId = idMap[action.songId] || action.songId;
+          await database.updateSong(songId, action.data);
+          break;
+        }
+        case 'DELETE_SONG': {
+          const songId = idMap[action.songId] || action.songId;
+          await database.deleteSong(songId, action.data);
+          break;
+        }
         default:
           console.warn('Type d\'action inconnu:', action.type);
       }
