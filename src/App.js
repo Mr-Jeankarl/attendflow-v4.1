@@ -13,6 +13,7 @@ import SingleOrgManager from './components/SingleOrgManager';
 import ConnectionStatus from './components/ConnectionStatus';
 import AdminManager from './components/AdminManager';
 import RepertoireView from './components/RepertoireView';
+import ValidationAnimation from './components/ValidationAnimation';
 
 // Firebase imports – safe stubs when in demo mode
 // (Using require() for conditional loading – ESLint-compliant because
@@ -119,6 +120,7 @@ function App() {
   // États de navigation
   const [currentView, setCurrentView] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarLocked, setIsSidebarLocked] = useState(() => localStorage.getItem('sidebarLocked') === 'true');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
 
@@ -127,6 +129,7 @@ function App() {
   const [sessions, setSessions] = useState(isDemoMode ? Object.values(DEMO_ORGANIZATION.sessions) : []);
   const [selectedSession, setSelectedSession] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [showValidation, setShowValidation] = useState({ show: false, message: '' });
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
 
   // États pour nouvelle session
@@ -427,7 +430,7 @@ function App() {
   const handleDeleteOrg = async () => {
     try {
       await deleteOrganization_fn();
-      alert('Organisation supprimée avec succès.');
+      setShowValidation({ show: true, message: 'Organisation supprimée avec succès.', type: 'delete' });
       window.location.reload(); // Recharger pour réinitialiser l'état global
     } catch (error) {
       alert(error.message);
@@ -488,7 +491,7 @@ function App() {
         if (!isDemoMode) await addMember_fn(newMember);
         // In demo: add directly to state
         setMembers(prev => [...prev, { ...newMember, id: 'demo_' + Date.now(), createdAt: new Date().toISOString() }]);
-        alert('✅ Membre ajouté avec succès !');
+        setShowValidation({ show: true, message: 'Membre ajouté avec succès !' });
       } else {
         // Mode offline : ajouter immédiatement à la liste locale
         setMembers([...members, memberWithId]);
@@ -506,7 +509,7 @@ function App() {
           id: Date.now().toString()
         });
 
-        alert('✅ Membre ajouté (sera synchronisé en ligne) !');
+        setShowValidation({ show: true, message: 'Membre ajouté (sera synchronisé en ligne) !' });
       }
 
       // Réinitialiser le formulaire
@@ -557,14 +560,14 @@ function App() {
     try {
       if (isOnline) {
         await deleteMember_fn(memberId);
-        alert(`✅ "${memberName}" a été supprimé.`);
+        setShowValidation({ show: true, message: `"${memberName}" a été supprimé.`, type: 'delete' });
       } else {
         addToOfflineQueue_fn({
           type: 'DELETE_MEMBER',
           memberId: memberId,
           id: Date.now().toString()
         });
-        alert(`✅ Suppression enregistrée (synchronisation en attente).`);
+        setShowValidation({ show: true, message: `Suppression enregistrée (synchronisation en attente).`, type: 'delete' });
       }
     } catch (error) {
       alert('❌ Erreur: ' + error.message);
@@ -684,7 +687,7 @@ function App() {
         } else {
           setSessions(prev => [...prev, sessionWithId]);
         }
-        alert('✅ Session enregistrée avec succès !');
+        setShowValidation({ show: true, message: 'Session enregistrée avec succès !' });
       } else {
         // Mode offline : ajouter immédiatement à la liste locale
         const sessionWithId = {
@@ -710,7 +713,7 @@ function App() {
           id: Date.now().toString()
         });
 
-        alert('✅ Session enregistrée (sera synchronisée en ligne) !');
+        setShowValidation({ show: true, message: 'Session enregistrée (sera synchronisée en ligne) !' });
       }
       setCurrentView('home');
     } catch (error) {
@@ -789,7 +792,7 @@ function App() {
       } else if (!isDemoMode) {
         cacheOrganization_fn('single_org', updatedOrg);
         addToOfflineQueue_fn({ type: 'DELETE_SONG', songId, data: songData, id: Date.now().toString() });
-        alert('✅ Suppression enregistrée hors-ligne (sera synchronisée) !');
+        setShowValidation({ show: true, message: 'Suppression enregistrée hors-ligne (sera synchronisée) !', type: 'delete' });
       }
     } catch (err) {
       alert('Erreur lors de la suppression : ' + err.message);
@@ -814,7 +817,7 @@ function App() {
     if (isDemoMode) { alert('⚠️ Non disponible en mode démo.'); return; }
     try {
       await removeCustomBackground_fn(themeType);
-      alert(`✅ Fond d'écran ${themeType === 'dark' ? 'sombre' : 'clair'} supprimé !`);
+      setShowValidation({ show: true, message: `Fond d'écran ${themeType === 'dark' ? 'sombre' : 'clair'} supprimé !`, type: 'delete' });
     } catch (error) {
       alert('Erreur lors de la suppression : ' + error.message);
     }
@@ -1132,51 +1135,66 @@ function App() {
         </div>
       )}
 
-      {/* Hamburger button */}
+      {/* Lock/Unlock sidebar button (PC only) */}
       <button
-        className="hamburger-btn"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className={`sidebar-lock-btn ${isSidebarLocked ? 'locked' : ''}`}
+        onClick={() => {
+          const newVal = !isSidebarLocked;
+          setIsSidebarLocked(newVal);
+          localStorage.setItem('sidebarLocked', String(newVal));
+        }}
+        title={isSidebarLocked ? 'Libérer la barre latérale' : 'Fixer la barre latérale'}
       >
-        ☰
+        {isSidebarLocked ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+        )}
       </button>
 
       {/* Sidebar */}
-      <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <div className={`sidebar ${sidebarOpen ? 'open' : ''} ${isSidebarLocked ? 'locked' : ''}`}>
         <button
           onClick={() => { setCurrentView('home'); setSidebarOpen(false); }}
           className={currentView === 'home' ? 'active' : ''}
         >
+          <span className="sidebar-btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
           Accueil
         </button>
         <button
           onClick={() => { setCurrentView('members'); setSidebarOpen(false); }}
           className={currentView === 'members' ? 'active' : ''}
         >
+          <span className="sidebar-btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
           Membres
         </button>
         <button
           onClick={() => { setCurrentView('history'); setSidebarOpen(false); }}
           className={currentView === 'history' ? 'active' : ''}
         >
+          <span className="sidebar-btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
           Historique
         </button>
         <button
           onClick={() => { setCurrentView('stats'); setSidebarOpen(false); }}
           className={currentView === 'stats' ? 'active' : ''}
         >
+          <span className="sidebar-btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
           Statistiques
         </button>
         <button
           onClick={() => { setCurrentView('repertoire'); setSidebarOpen(false); }}
           className={currentView === 'repertoire' ? 'active' : ''}
         >
-          🎵 Répertoire
+          <span className="sidebar-btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+          Répertoire
         </button>
         <button
           onClick={() => { setCurrentView('settings'); setSidebarOpen(false); }}
           className={currentView === 'settings' ? 'active' : ''}
         >
-          ⚙️ Paramètres
+          <span className="sidebar-btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          Paramètres
         </button>
       </div>
 
@@ -1415,7 +1433,7 @@ function App() {
                     <h3>{pupitre} ({pupitreMembers.length})</h3>
                     {pupitreMembers.map(member => (
                       <div key={member.id} className="member-item-new">
-                        <span className="member-name-text">{member.name}</span>
+                        <span className="member-name-text" onClick={() => viewMemberDetails(member)}>{member.name}</span>
                         <div className="member-actions-vertical">
                           <button onClick={() => viewMemberDetails(member)} className="btn-details">
                             📋 Détails
@@ -1928,6 +1946,13 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+      {showValidation.show && (
+        <ValidationAnimation
+          message={showValidation.message}
+          type={showValidation.type}
+          onComplete={() => setShowValidation({ show: false, message: '' })}
+        />
       )}
     </div>
   );
