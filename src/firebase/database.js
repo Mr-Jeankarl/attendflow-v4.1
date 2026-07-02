@@ -625,6 +625,179 @@ export const removeCustomBackground = async (themeType) => {
   }
 };
 
+// ==========================================
+// GESTION DES MEMBRES EN ATTENTE (PENDING)
+// ==========================================
+
+/**
+ * Soumettre une demande d'inscription comme membre
+ * Appelé après le signup Firebase Auth, vérifie le code d'invitation
+ * et crée une entrée dans pendingMembers
+ */
+export const submitMemberRequest = async (name, pupitre, inviteCode) => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Non authentifié');
+
+  try {
+    // Vérifier que l'organisation existe
+    const orgRef = ref(database, 'organization');
+    const orgSnapshot = await get(orgRef);
+
+    if (!orgSnapshot.exists()) {
+      throw new Error('Aucune organisation n\'existe encore.');
+    }
+
+    const orgData = orgSnapshot.val();
+
+    // Vérifier le code d'invitation
+    if (orgData.info?.inviteCode !== inviteCode) {
+      throw new Error('Code d\'invitation incorrect');
+    }
+
+    // Vérifier si l'utilisateur est déjà admin
+    if (orgData.admins?.[user.uid]) {
+      throw new Error('Vous êtes déjà administrateur de cette organisation');
+    }
+
+    // Vérifier si l'utilisateur est déjà en attente
+    if (orgData.pendingMembers?.[user.uid]) {
+      throw new Error('Votre demande est déjà en attente de validation');
+    }
+
+    // Créer la demande
+    const pendingRef = ref(database, `organization/pendingMembers/${user.uid}`);
+    await set(pendingRef, {
+      uid: user.uid,
+      name: name,
+      email: user.email || '',
+      pupitre: pupitre,
+      requestedAt: new Date().toISOString()
+    });
+
+    // Marquer l'utilisateur comme pending (pas encore hasOrganization)
+    await set(ref(database, `users/${user.uid}/pendingOrganization`), true);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Erreur soumission demande membre:', error);
+    throw error;
+  }
+};
+
+/**
+ * Récupérer la liste des membres en attente (admin uniquement)
+ */
+export const getPendingMembers = async () => {
+  try {
+    const pendingRef = ref(database, 'organization/pendingMembers');
+    const snapshot = await get(pendingRef);
+
+    if (!snapshot.exists()) return [];
+
+    return Object.values(snapshot.val());
+  } catch (error) {
+    console.error('Erreur récupération membres en attente:', error);
+    return [];
+  }
+};
+
+/**
+ * Approuver un membre en attente (admin uniquement)
+ * Déplace le pending vers members, supprime de pendingMembers
+ */
+export const approvePendingMember = async (pendingUid, correctedPupitre = null) => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Non authentifié');
+
+  try {
+    // Vérifier que l'utilisateur courant est admin
+    const isAdmin = await isUserAdmin(user.uid);
+    if (!isAdmin) throw new Error('Seul un administrateur peut valider des membres');
+
+    // Récupérer les données du membre en attente
+    const pendingRef = ref(database, `organization/pendingMembers/${pendingUid}`);
+    const snapshot = await get(pendingRef);
+
+    if (!snapshot.exists()) {
+      throw new Error('Ce membre n\'est plus en attente');
+    }
+
+    const pendingData = snapshot.val();
+
+    // Créer le membre dans la liste officielle
+    const memberRef = push(ref(database, 'organization/members'));
+    const memberId = memberRef.key;
+
+    const member = {
+      id: memberId,
+      name: pendingData.name,
+      pupitre: correctedPupitre || pendingData.pupitre,
+      email: pendingData.email || '',
+      phone: '',
+      birthday: '',
+      uid: pendingUid, // Lien vers le compte Firebase Auth
+      createdAt: new Date().toISOString(),
+      approvedBy: user.uid
+    };
+
+    await set(memberRef, member);
+
+    // Supprimer de pendingMembers
+    await remove(pendingRef);
+
+    // Marquer l'utilisateur comme ayant une organisation
+    await set(ref(database, `users/${pendingUid}/hasOrganization`), true);
+    await remove(ref(database, `users/${pendingUid}/pendingOrganization`));
+
+    return { memberId, member };
+  } catch (error) {
+    console.error('Erreur approbation membre:', error);
+    throw error;
+  }
+};
+
+/**
+ * Rejeter un membre en attente (admin uniquement)
+ */
+export const rejectPendingMember = async (pendingUid) => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Non authentifié');
+
+  try {
+    const isAdmin = await isUserAdmin(user.uid);
+    if (!isAdmin) throw new Error('Seul un administrateur peut rejeter des membres');
+
+    // Supprimer de pendingMembers
+    const pendingRef = ref(database, `organization/pendingMembers/${pendingUid}`);
+    await remove(pendingRef);
+
+    // Supprimer le flag pending
+    await remove(ref(database, `users/${pendingUid}/pendingOrganization`));
+
+    return { success: true };
+  } catch (error) {
+    console.error('Erreur rejet membre:', error);
+    throw error;
+  }
+};
+
+/**
+ * Vérifier si l'utilisateur est en attente de validation
+ */
+export const checkUserPendingStatus = async (userId = null) => {
+  const uid = userId || auth.currentUser?.uid;
+  if (!uid) return null;
+
+  try {
+    const pendingRef = ref(database, `organization/pendingMembers/${uid}`);
+    const snapshot = await get(pendingRef);
+    return snapshot.exists() ? snapshot.val() : null;
+  } catch (error) {
+    console.error('Erreur vérification statut pending:', error);
+    return null;
+  }
+};
+
 const databaseService = {
   createOrganization,
   joinOrganization,
@@ -647,7 +820,12 @@ const databaseService = {
   updateSong,
   deleteSong,
   uploadCustomBackground,
-  removeCustomBackground
+  removeCustomBackground,
+  submitMemberRequest,
+  getPendingMembers,
+  approvePendingMember,
+  rejectPendingMember,
+  checkUserPendingStatus
 };
 
 export default databaseService;

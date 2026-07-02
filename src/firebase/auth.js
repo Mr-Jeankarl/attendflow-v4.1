@@ -1,5 +1,6 @@
 // src/firebase/auth.js
 // Gestion de l'authentification Firebase
+// V4.1 — Email + Mot de passe uniquement
 
 import {
   createUserWithEmailAndPassword,
@@ -10,87 +11,17 @@ import {
 } from 'firebase/auth';
 import { ref, set, get, update } from 'firebase/database';
 import { auth, database } from './config';
+import { submitMemberRequest } from './database';
 
 // ==========================================
-// AUTHENTIFICATION AVEC CODE (Option 1)
-// ==========================================
-
-/**
- * Créer un compte avec nom d'utilisateur + code secret
- * Simule un login simple en créant un compte anonyme + métadonnées
- */
-export const signupWithCode = async (username, code) => {
-  try {
-    // Valider les entrées
-    if (!username || username.trim().length < 3) {
-      throw new Error('Le nom d\'utilisateur doit contenir au moins 3 caractères');
-    }
-    if (!code || code.trim().length < 6) {
-      throw new Error('Le code secret doit contenir au moins 6 caractères');
-    }
-
-    // Vérifier si le nom d'utilisateur existe déjà
-    const usernameRef = ref(database, `usernames/${username.toLowerCase()}`);
-    const snapshot = await get(usernameRef);
-
-    if (snapshot.exists()) {
-      throw new Error('Ce nom d\'utilisateur est déjà pris');
-    }
-
-    // Créer un email fictif pour Firebase Auth
-    const email = `${username.toLowerCase()}@attendflow.local`;
-
-    // Créer le compte Firebase
-    const userCredential = await createUserWithEmailAndPassword(auth, email, code);
-    const user = userCredential.user;
-
-    // Mettre à jour le profil
-    await updateProfile(user, {
-      displayName: username
-    });
-
-    // Sauvegarder les infos utilisateur dans la DB
-    await set(ref(database, `users/${user.uid}`), {
-      username: username,
-      authMethod: 'code',
-      createdAt: new Date().toISOString(),
-      organizations: []
-    });
-
-    // Réserver le nom d'utilisateur
-    await set(ref(database, `usernames/${username.toLowerCase()}`), user.uid);
-
-    return { user, username };
-  } catch (error) {
-    console.error('Erreur signup avec code:', error);
-    throw error;
-  }
-};
-
-/**
- * Se connecter avec nom d'utilisateur + code secret
- */
-export const signinWithCode = async (username, code) => {
-  try {
-    const email = `${username.toLowerCase()}@attendflow.local`;
-    const userCredential = await signInWithEmailAndPassword(auth, email, code);
-    return { user: userCredential.user, username };
-  } catch (error) {
-    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-      throw new Error('Nom d\'utilisateur ou code incorrect');
-    }
-    throw error;
-  }
-};
-
-// ==========================================
-// AUTHENTIFICATION AVEC EMAIL (Option 2)
+// AUTHENTIFICATION EMAIL + MOT DE PASSE
 // ==========================================
 
 /**
  * Créer un compte avec email + mot de passe
+ * Puis soumettre une demande d'inscription avec code d'invitation + pupitre
  */
-export const signupWithEmail = async (email, password, name) => {
+export const signupWithEmail = async (email, password, name, pupitre, inviteCode) => {
   try {
     // Valider les entrées
     if (!email || !email.includes('@')) {
@@ -102,8 +33,14 @@ export const signupWithEmail = async (email, password, name) => {
     if (!name || name.trim().length < 2) {
       throw new Error('Le nom doit contenir au moins 2 caractères');
     }
+    if (!pupitre) {
+      throw new Error('Veuillez choisir un pupitre');
+    }
+    if (!inviteCode || inviteCode.trim().length < 3) {
+      throw new Error('Le code d\'invitation est obligatoire');
+    }
 
-    // Créer le compte Firebase
+    // Créer le compte Firebase Auth
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
@@ -117,11 +54,13 @@ export const signupWithEmail = async (email, password, name) => {
       name: name,
       email: email,
       authMethod: 'email',
-      createdAt: new Date().toISOString(),
-      organizations: []
+      createdAt: new Date().toISOString()
     });
 
-    return { user, name };
+    // Soumettre la demande d'inscription (vérifie le code d'invitation)
+    await submitMemberRequest(name, pupitre, inviteCode);
+
+    return { user, name, pending: true };
   } catch (error) {
     if (error.code === 'auth/email-already-in-use') {
       throw new Error('Cette adresse email est déjà utilisée');
@@ -151,6 +90,9 @@ export const signinWithEmail = async (email, password) => {
     if (error.code === 'auth/invalid-email') {
       throw new Error('Adresse email invalide');
     }
+    if (error.code === 'auth/invalid-credential') {
+      throw new Error('Email ou mot de passe incorrect');
+    }
     throw error;
   }
 };
@@ -172,7 +114,7 @@ export const signOut = async () => {
 };
 
 /**
- * Réinitialisation du mot de passe (email uniquement)
+ * Réinitialisation du mot de passe
  */
 export const resetPassword = async (email) => {
   try {

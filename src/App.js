@@ -9,7 +9,8 @@ import { DEMO_ORGANIZATION, DEMO_USER } from './firebase/demoData';
 
 // Composants
 import AuthScreen from './components/AuthScreen';
-import SingleOrgManager from './components/SingleOrgManager';
+import PendingApprovalScreen from './components/PendingApprovalScreen';
+
 import ConnectionStatus from './components/ConnectionStatus';
 import AdminManager from './components/AdminManager';
 import RepertoireView from './components/RepertoireView';
@@ -42,6 +43,10 @@ let updateSong_fn = async () => {};
 let deleteSong_fn = async () => {};
 let uploadCustomBackground_fn = async () => {};
 let removeCustomBackground_fn = async () => {};
+
+let approvePendingMember_fn = async () => {};
+let rejectPendingMember_fn = async () => {};
+let checkUserPendingStatus_fn = async () => null;
 
 let checkOnlineStatus_fn = () => true;
 let watchOnlineStatus_fn = () => () => {};
@@ -87,6 +92,11 @@ if (!isDemoMode) {
   uploadCustomBackground_fn = dbModule.uploadCustomBackground;
   removeCustomBackground_fn = dbModule.removeCustomBackground;
 
+  // submitMemberRequest et getPendingMembers sont utilisés directement dans AuthScreen.js / via Firebase
+  approvePendingMember_fn = dbModule.approvePendingMember;
+  rejectPendingMember_fn = dbModule.rejectPendingMember;
+  checkUserPendingStatus_fn = dbModule.checkUserPendingStatus;
+
   checkOnlineStatus_fn = offlineModule.checkOnlineStatus;
   watchOnlineStatus_fn = offlineModule.watchOnlineStatus;
   syncOfflineActions_fn = offlineModule.syncOfflineActions;
@@ -104,6 +114,53 @@ if (!isDemoMode) {
 const PUPITRES = ['Soprano', 'Alto', 'Ténor', 'Basse', 'Instrumentistes', 'Maître de chœur'];
 
 
+// ==========================================
+// COMPOSANT LOCAL - Ligne d'un membre en attente
+// ==========================================
+function PendingMemberRow({ pending, pendingId, pendingPupitres, setPendingPupitres, onApprove, onReject }) {
+  const selectedPupitre = pendingPupitres[pendingId] || pending.pupitre || PUPITRES[0];
+
+  const requestDate = pending.requestedAt
+    ? new Date(pending.requestedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : 'Date inconnue';
+
+  return (
+    <div className="pending-item">
+      <div className="pending-info">
+        <span className="pending-name">{pending.name || 'Nom inconnu'}</span>
+        <span className="pending-email">{pending.email || ''}</span>
+        <span className="pending-date">Demande le {requestDate}</span>
+      </div>
+      <div className="pending-actions">
+        <div className="pending-select-group">
+          <label>Pupitre :</label>
+          <select
+            className="pending-pupitre-select"
+            value={selectedPupitre}
+            onChange={(e) => setPendingPupitres(prev => ({ ...prev, [pendingId]: e.target.value }))}
+          >
+            {PUPITRES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+        <div className="pending-btn-row">
+          <button
+            className="btn-approve-small"
+            onClick={() => onApprove(pendingId, selectedPupitre)}
+          >
+            ✅ Valider
+          </button>
+          <button
+            className="btn-reject-small"
+            onClick={() => onReject(pendingId)}
+          >
+            ❌ Rejeter
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   // États d'authentification et organisation
   const [isAuthenticated, setIsAuthenticated] = useState(isDemoMode);
@@ -111,6 +168,9 @@ function App() {
   const [hasOrganization, setHasOrganization] = useState(true); // Forced to true for single org
   const [organization, setOrganization] = useState(isDemoMode ? DEMO_ORGANIZATION : null);
   const [isOwner, setIsOwner] = useState(isDemoMode);
+  const [isPendingMember, setIsPendingMember] = useState(false);
+  const [requestedPupitre, setRequestedPupitre] = useState('');
+  const [pendingPupitres, setPendingPupitres] = useState({});
   const [loading, setLoading] = useState(!isDemoMode);
 
   // États de connexion
@@ -232,6 +292,22 @@ function App() {
           setCurrentUser(user);
           if (user.photoURL) setProfileImage(user.photoURL);
 
+          // Vérifier si l'utilisateur est en attente
+          try {
+            const pendingData = await checkUserPendingStatus_fn(user.uid);
+            if (pendingData) {
+              setIsPendingMember(true);
+              setRequestedPupitre(pendingData.pupitre || 'Non spécifié');
+              setLoading(false);
+              return;
+            } else {
+              setIsPendingMember(false);
+              setRequestedPupitre('');
+            }
+          } catch (pendingErr) {
+            console.error('Erreur vérification pending status:', pendingErr);
+          }
+
           // Vérifier si l'utilisateur a une organisation
           try {
             const userRef = ref_fn(database, `users/${user.uid}/hasOrganization`);
@@ -268,6 +344,8 @@ function App() {
           setCurrentUser(null);
           setHasOrganization(false);
           setOrganization(null);
+          setIsPendingMember(false);
+          setRequestedPupitre('');
         }
       } catch (error) {
         console.error('Erreur Auth Change:', error);
@@ -396,10 +474,7 @@ function App() {
     setIsAuthenticated(true);
   };
 
-  const handleOrgReady = () => {
-    setHasOrganization(true);
-    setCurrentView('home');
-  };
+
 
   const handleSignOut = async (noConfirm = false) => {
     const confirm = noConfirm || window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?');
@@ -410,6 +485,8 @@ function App() {
         setCurrentUser(null);
         setHasOrganization(false);
         setOrganization(null);
+        setIsPendingMember(false);
+        setRequestedPupitre('');
       } catch (error) {
         alert('Erreur lors de la déconnexion: ' + error.message);
       }
@@ -568,6 +645,76 @@ function App() {
           id: Date.now().toString()
         });
         setShowValidation({ show: true, message: `Suppression enregistrée (synchronisation en attente).`, type: 'delete' });
+      }
+    } catch (error) {
+      alert('❌ Erreur: ' + error.message);
+    }
+  };
+
+  const handleApprovePending = async (pendingUid, pupitre) => {
+    try {
+      if (isDemoMode) {
+        // En mode démo, ajouter directement le membre à l'état
+        const pendingMember = organization?.pendingMembers?.[pendingUid];
+        if (pendingMember) {
+          const newMember = {
+            id: 'demo_' + Date.now(),
+            name: pendingMember.name,
+            pupitre: pupitre,
+            email: pendingMember.email || '',
+            phone: '',
+            birthday: '',
+            createdAt: new Date().toISOString()
+          };
+          setMembers(prev => [...prev, newMember]);
+          
+          // Supprimer de pendingMembers de démo
+          const updatedPending = { ...organization.pendingMembers };
+          delete updatedPending[pendingUid];
+          setOrganization(prev => ({
+            ...prev,
+            pendingMembers: updatedPending
+          }));
+
+          setShowValidation({ show: true, message: `${pendingMember.name} a été validé avec succès !` });
+        }
+      } else {
+        if (!isOnline) {
+          alert("Désolé, la validation de membre nécessite une connexion Internet.");
+          return;
+        }
+        await approvePendingMember_fn(pendingUid, pupitre);
+        setShowValidation({ show: true, message: 'Membre validé avec succès !' });
+      }
+    } catch (error) {
+      alert('❌ Erreur: ' + error.message);
+    }
+  };
+
+  const handleRejectPending = async (pendingUid) => {
+    const confirm = window.confirm("Êtes-vous sûr de vouloir rejeter cette demande d'inscription ?");
+    if (!confirm) return;
+
+    try {
+      if (isDemoMode) {
+        // Supprimer de pendingMembers de démo
+        const pendingMember = organization?.pendingMembers?.[pendingUid];
+        if (pendingMember) {
+          const updatedPending = { ...organization.pendingMembers };
+          delete updatedPending[pendingUid];
+          setOrganization(prev => ({
+            ...prev,
+            pendingMembers: updatedPending
+          }));
+          setShowValidation({ show: true, message: 'Demande rejetée.', type: 'delete' });
+        }
+      } else {
+        if (!isOnline) {
+          alert("Désolé, le rejet de demande nécessite une connexion Internet.");
+          return;
+        }
+        await rejectPendingMember_fn(pendingUid);
+        setShowValidation({ show: true, message: 'Demande rejetée.', type: 'delete' });
       }
     } catch (error) {
       alert('❌ Erreur: ' + error.message);
@@ -1088,6 +1235,10 @@ function App() {
 
   const isAdmin = isOwner || (organization?.admins?.[currentUser?.uid]?.role === 'admin');
 
+  const pendingMembersList = organization?.pendingMembers
+    ? Object.values(organization.pendingMembers)
+    : [];
+
   // Custom background URL for current theme
   const customBgUrl = organization?.info?.[`customBg_${theme}`];
 
@@ -1121,12 +1272,23 @@ function App() {
     return <AuthScreen onAuthSuccess={handleAuthSuccess} isOnline={isOnline} />;
   }
 
+  // En attente d'approbation
+  if (isPendingMember) {
+    return (
+      <PendingApprovalScreen
+        user={currentUser}
+        requestedPupitre={requestedPupitre}
+        onSignOut={() => handleSignOut(true)}
+      />
+    );
+  }
+
   // App is now single org by default, bypassing SingleOrgManager
   // (No 'if (!hasOrganization)' block)
 
   // Application principale
   return (
-    <div className={`App ${theme}-theme`} style={{ backgroundImage: `url(${customBgUrl || `/assets/default_bg_${theme}.png`})` }}>
+    <div className={`App ${theme}-theme`} style={{ backgroundImage: `url(${customBgUrl || `/assets/default_bg_${theme}.jpg`})` }}>
       {/* Demo Mode Banner */}
       {isDemoMode && (
         <div className="demo-banner">
@@ -1193,7 +1355,12 @@ function App() {
           onClick={() => { setCurrentView('settings'); setSidebarOpen(false); }}
           className={currentView === 'settings' ? 'active' : ''}
         >
-          <span className="sidebar-btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <span className="sidebar-btn-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            {pendingMembersList.length > 0 && isAdmin && (
+              <span className="badge-red-dot">{pendingMembersList.length}</span>
+            )}
+          </span>
           Paramètres
         </button>
       </div>
@@ -1606,6 +1773,57 @@ function App() {
             </div>
 
             {(isOwner || isAdmin) && (
+              <div className="settings-section pending-members-section">
+                <h3>👥 Membres en attente {pendingMembersList.length > 0 && <span className="badge-count-red">{pendingMembersList.length}</span>}</h3>
+                <div className="settings-card">
+                  {pendingMembersList.length === 0 ? (
+                    <p className="empty-state-settings">Aucune demande d'inscription en attente.</p>
+                  ) : (
+                    <div className="pending-list">
+                      {pendingMembersList.map(pending => (
+                        <div key={pending.uid} className="pending-item">
+                          <div className="pending-info">
+                            <span className="pending-name">{pending.name}</span>
+                            <span className="pending-email">{pending.email}</span>
+                            <span className="pending-date">Demandé le {new Date(pending.requestedAt).toLocaleDateString('fr-FR')}</span>
+                          </div>
+                          <div className="pending-actions">
+                            <div className="pending-select-group">
+                              <label>Pupitre :</label>
+                              <select
+                                value={pendingPupitres[pending.uid] || pending.pupitre}
+                                onChange={(e) => setPendingPupitres(prev => ({ ...prev, [pending.uid]: e.target.value }))}
+                                className="pending-pupitre-select"
+                              >
+                                {PUPITRES.map(p => (
+                                  <option key={p} value={p}>{p}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="pending-btn-row">
+                              <button
+                                onClick={() => handleApprovePending(pending.uid, pendingPupitres[pending.uid] || pending.pupitre)}
+                                className="btn-approve-small"
+                              >
+                                ✅ Valider
+                              </button>
+                              <button
+                                onClick={() => handleRejectPending(pending.uid)}
+                                className="btn-reject-small"
+                              >
+                                ❌ Rejeter
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {(isOwner || isAdmin) && (
               <div className="settings-section">
                 <h3>🎨 Fonds d'écran personnalisés</h3>
                 <div className="settings-card">
@@ -1724,6 +1942,39 @@ function App() {
               </div>
             </div>
 
+            {isAdmin && (
+              <div className="settings-section pending-members-section">
+                <h3>
+                  ⏳ Membres en attente de validation
+                  {pendingMembersList.length > 0 && (
+                    <span className="badge-count-red">{pendingMembersList.length}</span>
+                  )}
+                </h3>
+                <div className="settings-card">
+                  {pendingMembersList.length === 0 ? (
+                    <p className="empty-state-settings">✅ Aucune demande d'inscription en attente.</p>
+                  ) : (
+                    <div className="pending-list">
+                      {pendingMembersList.map((pending) => {
+                        const pendingId = pending.uid || Object.keys(organization.pendingMembers || {}).find(k => organization.pendingMembers[k] === pending);
+                        return (
+                          <PendingMemberRow
+                            key={pendingId}
+                            pending={pending}
+                            pendingId={pendingId}
+                            pendingPupitres={pendingPupitres}
+                            setPendingPupitres={setPendingPupitres}
+                            onApprove={handleApprovePending}
+                            onReject={handleRejectPending}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {isOwner && (
               <>
                 <div className="settings-section">
@@ -1797,7 +2048,12 @@ function App() {
           className={`bottom-nav-item ${currentView === 'settings' ? 'active' : ''}`}
           onClick={() => setCurrentView('settings')}
         >
-          <span className="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <span className="nav-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            {pendingMembersList.length > 0 && isAdmin && (
+              <span className="badge-red-dot-mobile">{pendingMembersList.length}</span>
+            )}
+          </span>
           <span>Paramètres</span>
         </button>
       </nav>

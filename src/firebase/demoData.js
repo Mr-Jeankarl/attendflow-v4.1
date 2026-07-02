@@ -91,6 +91,12 @@ export const DEMO_REPERTOIRE = {
 };
 
 // Organisation de démonstration complète
+// Organisation de démonstration complète
+export const DEMO_PENDING_MEMBERS = {
+  'pm1': { uid: 'pm1', name: 'Jean Dupont', email: 'jean.dupont@demo.bf', pupitre: 'Ténor', requestedAt: new Date().toISOString() },
+  'pm2': { uid: 'pm2', name: 'Marie Koné', email: 'marie.kone@demo.bf', pupitre: 'Soprano', requestedAt: new Date().toISOString() }
+};
+
 export const DEMO_ORGANIZATION = {
   info: {
     name: 'Grand Chœur Polyphonique de Bobo-Dioulasso',
@@ -102,7 +108,8 @@ export const DEMO_ORGANIZATION = {
   },
   members: DEMO_MEMBERS,
   sessions: DEMO_SESSIONS,
-  repertoire: DEMO_REPERTOIRE
+  repertoire: DEMO_REPERTOIRE,
+  pendingMembers: DEMO_PENDING_MEMBERS
 };
 
 // Utilisateur de démonstration

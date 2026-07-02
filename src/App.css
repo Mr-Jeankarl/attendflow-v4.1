@@ -2999,4 +2999,321 @@ body {
 @keyframes scaleUpContent {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
-}
+}
+
+/* ==========================================
+   STYLES POUR INSCRIPTION LIBRE & VALIDATION ADMIN
+   ========================================== */
+
+/* Écran d'attente (Pending screen) */
+.pending-container {
+  max-width: 480px;
+  width: 100%;
+}
+
+.pending-status-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 30px 20px;
+  text-align: center;
+  margin-bottom: 25px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.pending-icon {
+  font-size: 3.5rem;
+  margin-bottom: 15px;
+  animation: pulseIcon 2s infinite ease-in-out;
+}
+
+@keyframes pulseIcon {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.pending-status-card h3 {
+  color: #fbbf24; /* Amber text */
+  margin-bottom: 12px;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.pending-message {
+  color: #d1d5db;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.pending-details {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 15px;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pending-detail-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.9rem;
+}
+
+.pending-detail-item:last-child {
+  border-bottom: none;
+}
+
+.pending-detail-item strong {
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.pending-detail-item span {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.badge-pupitre {
+  background: rgba(107, 93, 211, 0.2);
+  color: #a78bfa;
+  border: 1px solid rgba(107, 93, 211, 0.4);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* Formulaire d'auth - select dropdown */
+.auth-select {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(26, 26, 26, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.3s;
+}
+
+.auth-select:focus {
+  border-color: #00d4ff;
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+}
+
+.auth-select option {
+  background-color: #1a1a2e;
+  color: #ffffff;
+}
+
+/* Badge de notification rouge (Sidebar / Mobile bottom nav) */
+.sidebar-btn-icon {
+  position: relative;
+}
+
+.badge-red-dot {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background-color: #ef4444;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: bold;
+  height: 16px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #1a1a2e;
+}
+
+.nav-icon {
+  position: relative;
+}
+
+.badge-red-dot-mobile {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  background-color: #ef4444;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: bold;
+  height: 14px;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--card-bg);
+}
+
+.badge-count-red {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ef4444;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: bold;
+  height: 20px;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* Paramètres - Section Membres en attente */
+.pending-members-section h3 {
+  display: flex;
+  align-items: center;
+}
+
+.pending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.pending-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  gap: 15px;
+  flex-wrap: wrap;
+  transition: background 0.3s;
+}
+
+.pending-item:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.pending-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.pending-name {
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 1.1rem;
+}
+
+.pending-email {
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.pending-date {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.pending-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 220px;
+}
+
+@media (max-width: 600px) {
+  .pending-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pending-actions {
+    align-items: stretch;
+  }
+}
+
+.pending-select-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: #9ca3af;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.pending-pupitre-select {
+  padding: 6px 12px;
+  background: rgba(26, 26, 26, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  max-width: 150px;
+}
+
+.pending-btn-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.btn-approve-small {
+  padding: 6px 12px;
+  background: rgba(5, 150, 105, 0.2);
+  border: 1px solid rgba(5, 150, 105, 0.4);
+  color: #34d399;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.btn-approve-small:hover {
+  background: #059669;
+  color: white;
+}
+
+.btn-reject-small {
+  padding: 6px 12px;
+  background: rgba(220, 38, 38, 0.2);
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  color: #f87171;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.btn-reject-small:hover {
+  background: #dc2626;
+  color: white;
+}
+
+.empty-state-settings {
+  text-align: center;
+  color: #6b7280;
+  padding: 20px;
+  font-size: 0.9rem;
+}
+
