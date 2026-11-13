@@ -21,11 +21,13 @@ export default function PWAInstallPrompt() {
 
     setIos(isIOSDevice());
     const timer = window.setTimeout(() => setVisible(true), 1400);
+
     const onBeforeInstallPrompt = (event) => {
       event.preventDefault();
       setInstallEvent(event);
       setVisible(true);
     };
+
     const onInstalled = () => {
       setVisible(false);
       setInstallEvent(null);
@@ -48,9 +50,11 @@ export default function PWAInstallPrompt() {
 
   const install = async () => {
     if (!installEvent) {
-      setMessage(ios
-        ? 'Sur iPhone : touchez Partager dans Safari, puis « Sur l’écran d’accueil ».'
-        : 'Dans le menu de votre navigateur, choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».');
+      setMessage(
+        ios
+          ? 'Sur iPhone : touchez Partager dans Safari, puis « Sur l’écran d’accueil ». '
+          : 'Dans le menu de votre navigateur, choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ». '
+      );
       return;
     }
 
