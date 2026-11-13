@@ -18,24 +18,12 @@ export default function PWAInstallPrompt() {
 
   useEffect(() => {
     if (isStandalone() || window.sessionStorage.getItem(DISMISS_KEY)) return undefined;
-
     setIos(isIOSDevice());
     const timer = window.setTimeout(() => setVisible(true), 1400);
-
-    const onBeforeInstallPrompt = (event) => {
-      event.preventDefault();
-      setInstallEvent(event);
-      setVisible(true);
-    };
-
-    const onInstalled = () => {
-      setVisible(false);
-      setInstallEvent(null);
-    };
-
+    const onBeforeInstallPrompt = (event) => { event.preventDefault(); setInstallEvent(event); setVisible(true); };
+    const onInstalled = () => { setVisible(false); setInstallEvent(null); };
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
     window.addEventListener('appinstalled', onInstalled);
-
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
@@ -43,21 +31,14 @@ export default function PWAInstallPrompt() {
     };
   }, []);
 
-  const dismiss = () => {
-    window.sessionStorage.setItem(DISMISS_KEY, 'true');
-    setVisible(false);
-  };
-
+  const dismiss = () => { window.sessionStorage.setItem(DISMISS_KEY, 'true'); setVisible(false); };
   const install = async () => {
     if (!installEvent) {
-      setMessage(
-        ios
-          ? 'Sur iPhone : touchez Partager dans Safari, puis « Sur l’écran d’accueil ». '
-          : 'Dans le menu de votre navigateur, choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ». '
-      );
+      setMessage(ios
+        ? 'Sur iPhone : touchez Partager dans Safari, puis « Sur l’écran d’accueil ».'
+        : 'Dans le menu du navigateur, choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ».');
       return;
     }
-
     installEvent.prompt();
     const choice = await installEvent.userChoice;
     if (choice?.outcome === 'accepted') setVisible(false);
@@ -65,20 +46,12 @@ export default function PWAInstallPrompt() {
   };
 
   if (!visible || isStandalone()) return null;
-
   return (
     <aside className="pwa-install-card" aria-label="Installer AttendFlow">
       <div className="pwa-install-icon" aria-hidden="true">A</div>
-      <div className="pwa-install-copy">
-        <strong>Installer AttendFlow</strong>
-        <span>{message}</span>
-      </div>
-      <button type="button" className="pwa-install-action" onClick={install}>
-        Installer
-      </button>
-      <button type="button" className="pwa-install-dismiss" onClick={dismiss} aria-label="Plus tard">
-        Plus tard
-      </button>
+      <div className="pwa-install-copy"><strong>Installer AttendFlow</strong><span>{message}</span></div>
+      <button type="button" className="pwa-install-action" onClick={install}>Installer</button>
+      <button type="button" className="pwa-install-dismiss" onClick={dismiss} aria-label="Plus tard">Plus tard</button>
     </aside>
   );
 }
