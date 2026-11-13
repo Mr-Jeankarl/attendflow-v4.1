@@ -29,6 +29,13 @@ const AuthScreen = ({ onAuthSuccess, isOnline }) => {
     setError('');
   };
 
+  const handlePreview = () => {
+    // Le paramètre active le mode aperçu au prochain chargement, sans appeler Firebase.
+    const previewUrl = new URL(window.location.href);
+    previewUrl.searchParams.set('preview', '1');
+    window.location.assign(previewUrl.toString());
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -180,6 +187,15 @@ const AuthScreen = ({ onAuthSuccess, isOnline }) => {
             >
               {loading ? '⏳ Chargement...' : (!isOnline ? 'Internet requis' : (isLogin ? 'Se connecter' : 'Créer mon compte'))}
             </button>
+            {isLogin && (
+              <button
+                type="button"
+                className="btn-secondary btn-large"
+                onClick={handlePreview}
+              >
+                👀 Passer en mode aperçu
+              </button>
+            )}
           </div>
         </form>
 
@@ -191,6 +207,7 @@ const AuthScreen = ({ onAuthSuccess, isOnline }) => {
               {isLogin ? "S'inscrire" : "Se connecter"}
             </button>
           </p>
+          {isLogin && <p className="auth-preview-note">Le mode aperçu utilise uniquement des données fictives.</p>}
         </div>
       </div>
     </div>
