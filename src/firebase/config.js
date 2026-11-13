@@ -1,14 +1,34 @@
 // src/firebase/config.js
 // Configuration Firebase pour AttendFlow
 
+const getPreviewMode = () => {
+  if (typeof window === 'undefined') return false;
+
+  const params = new URLSearchParams(window.location.search);
+  const previewParam = params.get('preview');
+
+  if (previewParam === '1') {
+    localStorage.setItem('attendflow_preview', 'true');
+    return true;
+  }
+
+  if (previewParam === '0') {
+    localStorage.removeItem('attendflow_preview');
+    return false;
+  }
+
+  return localStorage.getItem('attendflow_preview') === 'true';
+};
+
 // Detect demo mode (no Firebase credentials configured)
 const hasFbConfig = process.env.REACT_APP_FIREBASE_API_KEY &&
   process.env.REACT_APP_FIREBASE_API_KEY !== 'your_api_key_here';
 
-export const isDemoMode = !hasFbConfig;
+export const isPreviewMode = getPreviewMode();
+export const isDemoMode = !hasFbConfig || isPreviewMode;
 
 if (isDemoMode) {
-  console.warn('⚠️ AttendFlow en MODE DÉMO – aucune clé Firebase détectée.');
+  console.warn('⚠️ AttendFlow en MODE DÉMO – aucune clé Firebase détectée ou mode aperçu activé.');
 }
 
 let app = null;
