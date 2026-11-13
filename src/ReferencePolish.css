@@ -1,0 +1,41 @@
+/* Theme contrast and retained legacy-feature access for the reference dashboard. */
+.reference-backdrop { background: rgba(244,243,239,.58); }
+.reference-app.dark-theme .reference-backdrop { background: rgba(11,21,34,.48); }
+.reference-app.dark-theme .reference-metrics-panel { background: rgba(25,39,55,.76); }
+.reference-app.dark-theme .reference-metric,
+.reference-app.dark-theme .reference-participation { background: rgba(246,244,238,.96); }
+.reference-app.dark-theme .reference-metric p,
+.reference-app.dark-theme .reference-metric p span,
+.reference-app.dark-theme .reference-participation div span { color: #233a53; }
+.reference-app.dark-theme .reference-ring::before { background: #fffdf8; }
+.reference-app.dark-theme .reference-ring strong { color: #173c68; }
+.reference-app.dark-theme .reference-count-card:not(.dark) { background: rgba(250,249,245,.97); }
+.reference-app.dark-theme .reference-count-card:not(.dark) strong { color: #173c68; }
+.reference-app.dark-theme .reference-count-card:not(.dark) span { color: #687789; }
+.reference-app.dark-theme .reference-list-card,
+.reference-app.dark-theme .reference-profile-card,
+.reference-app.dark-theme .reference-info-card { background: rgba(246,244,238,.96); border-color: rgba(255,255,255,.24); }
+.reference-app.dark-theme .reference-list-card strong,
+.reference-app.dark-theme .reference-profile-card strong,
+.reference-app.dark-theme .reference-info-card strong { color: #173c68; }
+.reference-app.dark-theme .reference-list-card small,
+.reference-app.dark-theme .reference-profile-card small,
+.reference-app.dark-theme .reference-info-card span { color: #596c7f; }
+.reference-app.dark-theme .reference-list-icon { background: rgba(23,60,104,.09); color: #173c68; }
+.reference-app.dark-theme .reference-list-arrow { color: #687789; }
+.reference-member-copy { flex: 1; min-width: 0; display: grid; gap: 4px; text-align: left; }
+.reference-list-card { width: 100%; text-align: left; cursor: pointer; }
+.reference-full-app-button { width: 100%; margin-top: 12px; padding: 0 16px; }
+.reference-return-preview { position: fixed; z-index: 2000; right: 14px; top: 14px; min-height: 42px; padding: 0 14px; border: 1px solid rgba(255,255,255,.28); border-radius: 999px; background: #173c68; color: #fff; font-weight: 750; box-shadow: 0 6px 20px rgba(0,0,0,.2); cursor: pointer; }
+.reference-full-app-wrap .App { background-image: var(--attendflow-background-image) !important; }
+.reference-full-app-wrap .App.dark-theme { --attendflow-background-image: url('/assets/default_bg_dark.jpg'); }
+.reference-full-app-wrap .App.light-theme { --attendflow-background-image: url('/assets/default_bg_light.jpg'); }
+.reference-full-app-wrap .App .home-view,
+.reference-full-app-wrap .App .session-view,
+.reference-full-app-wrap .App .members-view,
+.reference-full-app-wrap .App .history-view,
+.reference-full-app-wrap .App .stats-view,
+.reference-full-app-wrap .App .settings-view { color: var(--ink); }
+@media (max-width: 520px) {
+  .reference-return-preview { top: auto; right: 14px; bottom: calc(86px + env(safe-area-inset-bottom)); }
+}

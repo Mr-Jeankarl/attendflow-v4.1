@@ -1,11 +1,10 @@
+// src/components/PWAInstallPrompt.js
 import React, { useEffect, useState } from 'react';
 
 const DISMISS_KEY = 'attendflow_install_prompt_dismissed';
-
 function isIOSDevice() {
   return /iphone|ipad|ipod/i.test(window.navigator.userAgent) && !window.navigator.standalone;
 }
-
 function isStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }

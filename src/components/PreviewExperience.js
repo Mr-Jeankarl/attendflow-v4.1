@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import App from '../App';
 import { DEMO_MEMBERS, DEMO_SESSIONS, DEMO_ORGANIZATION, DEMO_USER } from '../firebase/demoData';
 
 const NAV_ITEMS = [
@@ -12,6 +13,7 @@ const NAV_ITEMS = [
 function PreviewExperience() {
   const [view, setView] = useState('home');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [showFullApp, setShowFullApp] = useState(false);
   const members = useMemo(() => Object.values(DEMO_MEMBERS), []);
   const sessions = useMemo(() => Object.values(DEMO_SESSIONS).sort((a, b) => b.date.localeCompare(a.date)), []);
   const stats = useMemo(() => {
@@ -37,6 +39,22 @@ function PreviewExperience() {
     };
   }, [members, sessions]);
 
+  // Legacy AttendFlow remains available from the preview profile, including member details,
+  // session attendance details, settings, exports, and existing management actions.
+  useEffect(() => {
+    if (!showFullApp) return undefined;
+    const applyInlineBackground = () => {
+      const appElement = document.querySelector('.App');
+      const image = appElement?.style.backgroundImage;
+      if (appElement && image) appElement.style.setProperty('background-image', image, 'important');
+    };
+    applyInlineBackground();
+    const observer = new MutationObserver(applyInlineBackground);
+    const appElement = document.querySelector('.App');
+    if (appElement) observer.observe(appElement, { attributes: true, attributeFilter: ['style'] });
+    return () => observer.disconnect();
+  }, [showFullApp]);
+
   const changeTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
@@ -47,6 +65,17 @@ function PreviewExperience() {
     setView(next);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  if (showFullApp) {
+    return (
+      <div className="reference-full-app-wrap">
+        <App />
+        <button type="button" className="reference-return-preview" onClick={() => setShowFullApp(false)}>
+          ← Retour au tableau de bord aperçu
+        </button>
+      </div>
+    );
+  }
 
   const title = {
     home: 'Accueil', members: 'Membres', history: 'Historique', repertoire: 'Répertoire',
@@ -112,6 +141,7 @@ function PreviewExperience() {
             sessions={sessions}
             onBack={() => go('home')}
             onOpenMember={() => go('members')}
+            onOpenFullApp={() => setShowFullApp(true)}
           />
         )}
       </main>
@@ -137,24 +167,24 @@ function MetricRing({ value, label, suffix }) {
   );
 }
 
-function PreviewPage({ view, title, members, sessions, onBack, onOpenMember }) {
+function PreviewPage({ view, title, members, sessions, onBack, onOpenMember, onOpenFullApp }) {
   if (view === 'newSession') {
-    return <section className="reference-subpage"><button className="reference-back" onClick={onBack}>← Retour</button><h1>{title}</h1><p>Les créations effectuées dans le mode aperçu restent fictives.</p><div className="reference-info-card"><strong>Mode démonstration</strong><span>Les modifications ne sont pas envoyées à Firebase.</span></div></section>;
+    return <section className="reference-subpage"><button className="reference-back" onClick={onBack}>← Retour</button><h1>{title}</h1><p>Les créations effectuées dans le mode aperçu restent fictives.</p><div className="reference-info-card"><strong>Mode démonstration</strong><span>Les modifications ne sont pas envoyées à Firebase.</span></div><button className="reference-primary-action reference-full-app-button" onClick={onOpenFullApp}>Ouvrir la gestion complète</button></section>;
   }
   if (view === 'members') {
-    return <section className="reference-subpage"><button className="reference-back" onClick={onBack}>← Accueil</button><div className="reference-page-heading"><span>CHORALE</span><h1>{title}</h1><p>{members.length} membres fictifs</p></div><div className="reference-list">{members.map((member) => <article className="reference-list-card" key={member.id}><span className="reference-avatar">{member.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><div><strong>{member.name}</strong><small>{member.pupitre}</small></div><span className="reference-list-arrow">›</span></article>)}</div></section>;
+    return <section className="reference-subpage"><button className="reference-back" onClick={onBack}>← Accueil</button><div className="reference-page-heading"><span>CHORALE</span><h1>{title}</h1><p>{members.length} membres fictifs · Touchez un membre pour consulter ses informations</p></div><div className="reference-list">{members.map((member) => <button type="button" className="reference-list-card" key={member.id} onClick={onOpenFullApp}><span className="reference-avatar">{member.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><span className="reference-member-copy"><strong>{member.name}</strong><small>{member.pupitre} · {member.phone}</small></span><span className="reference-list-arrow">›</span></button>)}</div><button className="reference-primary-action reference-full-app-button" onClick={onOpenFullApp}>Ouvrir les détails et la gestion des membres</button></section>;
   }
   if (view === 'history') {
-    return <section className="reference-subpage"><button className="reference-back" onClick={onBack}>← Accueil</button><div className="reference-page-heading"><span>ACTIVITÉS</span><h1>{title}</h1><p>{sessions.length} sessions enregistrées</p></div><div className="reference-list">{sessions.map((session) => <article className="reference-list-card session" key={session.id}><span className="reference-list-icon">◷</span><div><strong>{session.activityName}</strong><small>{session.date} · {session.startTime} · {session.location}</small></div><span className="reference-list-arrow">›</span></article>)}</div></section>;
+    return <section className="reference-subpage"><button className="reference-back" onClick={onBack}>← Accueil</button><div className="reference-page-heading"><span>ACTIVITÉS</span><h1>{title}</h1><p>{sessions.length} sessions · touchez une session pour voir présences et absences</p></div><div className="reference-list">{sessions.map((session) => <button type="button" className="reference-list-card session" key={session.id} onClick={onOpenFullApp}><span className="reference-list-icon">◷</span><span className="reference-member-copy"><strong>{session.activityName}</strong><small>{session.date} · {session.startTime} · {session.location}</small></span><span className="reference-list-arrow">›</span></button>)}</div><button className="reference-primary-action reference-full-app-button" onClick={onOpenFullApp}>Ouvrir les détails complets des sessions</button></section>;
   }
   if (view === 'repertoire') {
     const songs = Object.values(DEMO_ORGANIZATION.repertoire || {});
-    return <section className="reference-subpage"><button className="reference-back" onClick={onBack}>← Accueil</button><div className="reference-page-heading"><span>CHANTS</span><h1>{title}</h1><p>Le répertoire de démonstration</p></div><div className="reference-list">{songs.map((song) => <article className="reference-list-card session" key={song.id}><span className="reference-list-icon">♫</span><div><strong>{song.title}</strong><small>{song.composer || 'Chant de la chorale'}</small></div><span className="reference-list-arrow">›</span></article>)}</div></section>;
+    return <section className="reference-subpage"><button className="reference-back" onClick={onBack}>← Accueil</button><div className="reference-page-heading"><span>CHANTS</span><h1>{title}</h1><p>Le répertoire de démonstration</p></div><div className="reference-list">{songs.map((song) => <button type="button" className="reference-list-card session" key={song.id} onClick={onOpenFullApp}><span className="reference-list-icon">♫</span><span className="reference-member-copy"><strong>{song.title}</strong><small>{song.composer || 'Chant de la chorale'}</small></span><span className="reference-list-arrow">›</span></button>)}</div><button className="reference-primary-action reference-full-app-button" onClick={onOpenFullApp}>Ouvrir le répertoire complet</button></section>;
   }
   if (view === 'notifications') {
     return <section className="reference-subpage"><button className="reference-back" onClick={onBack}>← Accueil</button><div className="reference-page-heading"><span>INFORMATIONS</span><h1>{title}</h1></div><div className="reference-info-card"><strong>Tout est à jour</strong><span>Les notifications de démonstration apparaîtront ici.</span></div></section>;
   }
-  return <section className="reference-subpage"><button className="reference-back" onClick={onBack}>← Accueil</button><div className="reference-page-heading"><span>COMPTE DE DÉMONSTRATION</span><h1>{title}</h1></div><div className="reference-profile-card"><span className="reference-avatar large">KM</span><div><strong>{DEMO_USER.displayName}</strong><small>{DEMO_USER.email}</small></div></div><button type="button" className="reference-gold-action reference-profile-members" onClick={onOpenMember}>Voir les membres de la chorale</button></section>;
+  return <section className="reference-subpage"><button className="reference-back" onClick={onBack}>← Accueil</button><div className="reference-page-heading"><span>COMPTE DE DÉMONSTRATION</span><h1>{title}</h1></div><div className="reference-profile-card"><span className="reference-avatar large">KM</span><div><strong>{DEMO_USER.displayName}</strong><small>{DEMO_USER.email}</small></div></div><button type="button" className="reference-gold-action reference-profile-members" onClick={onOpenMember}>Voir les membres de la chorale</button><button type="button" className="reference-primary-action reference-full-app-button" onClick={onOpenFullApp}>Ouvrir AttendFlow complet · paramètres, exports et gestion</button></section>;
 }
 
 export default PreviewExperience;
