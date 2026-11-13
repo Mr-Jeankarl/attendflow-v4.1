@@ -2,6 +2,7 @@
 // Login/signup screen styled after the supplied MyChoir reference.
 
 import React, { useState } from 'react';
+import '../AuthActions.css';
 import { resetPassword, signinWithEmail, signinWithGoogle, signupWithEmail } from '../firebase/auth';
 
 const PUPITRES = ['Soprano', 'Alto', 'Ténor', 'Basse', 'Instrumentistes', 'Maître de chœur'];
@@ -26,10 +27,16 @@ const AuthScreen = ({ onAuthSuccess, isOnline }) => {
   const completeAuth = () => { if (onAuthSuccess) onAuthSuccess(); };
 
   const runAuth = async (action) => {
-    setError(''); setLoading(true);
-    try { await action(); completeAuth(); }
-    catch (err) { setError(err.message || 'Une erreur est survenue.'); }
-    finally { setLoading(false); }
+    setError('');
+    setLoading(true);
+    try {
+      await action();
+      completeAuth();
+    } catch (err) {
+      setError(err.message || 'Une erreur est survenue.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -49,6 +56,11 @@ const AuthScreen = ({ onAuthSuccess, isOnline }) => {
   };
 
   const handleGoogle = () => runAuth(() => signinWithGoogle());
+
+  const handleApple = () => {
+    setError('La connexion avec Apple sera disponible prochainement.');
+  };
+
   const handleForgotPassword = () => {
     if (!email.trim()) {
       setError('Saisissez votre adresse e-mail pour recevoir le lien de réinitialisation.');
@@ -94,6 +106,7 @@ const AuthScreen = ({ onAuthSuccess, isOnline }) => {
           <button type="submit" className="reference-login-button" disabled={loading || !isOnline}>{loading ? 'Connexion…' : isLogin ? 'Se connecter' : 'Créer mon compte'}</button>
           {isLogin && <>
             <button type="button" className="reference-google-button" onClick={handleGoogle} disabled={loading || !isOnline}><span className="google-g">G</span> Continuer avec Google</button>
+            <button type="button" className="reference-apple-button" onClick={handleApple} aria-label="Continuer avec Apple"><span className="apple-mark" aria-hidden="true">●</span> Continuer avec Apple</button>
             <div className="reference-auth-links"><button type="button" onClick={switchMode} disabled={!isOnline}>Créer un compte</button><button type="button" onClick={handleForgotPassword} disabled={loading || !isOnline}>Mot de passe oublié ?</button></div>
             <button type="button" className="reference-preview-link" onClick={() => { const url = new URL(window.location.href); url.searchParams.set('preview', '1'); window.location.assign(url.toString()); }}>👀 Passer en mode aperçu</button>
           </>}

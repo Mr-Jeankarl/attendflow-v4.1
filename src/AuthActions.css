@@ -1,0 +1,48 @@
+/* Secondary sign-in option presented to match the supplied reference. */
+.reference-apple-button {
+  min-height: 49px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  border: 1px solid #17202a;
+  border-radius: 999px;
+  background: #17202a;
+  color: #fff;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+.reference-apple-button:hover {
+  background: #283442;
+  box-shadow: 0 6px 16px rgba(20, 32, 45, .2);
+}
+.apple-mark {
+  position: relative;
+  display: inline-flex;
+  width: 17px;
+  height: 17px;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-size: 0;
+}
+.apple-mark::before {
+  content: '';
+  width: 14px;
+  height: 13px;
+  border-radius: 45% 45% 48% 48%;
+  background: #fff;
+  clip-path: polygon(50% 20%, 63% 8%, 78% 6%, 70% 22%, 62% 27%, 80% 27%, 91% 40%, 88% 67%, 76% 88%, 61% 96%, 49% 89%, 36% 96%, 20% 89%, 9% 66%, 8% 43%, 20% 28%, 38% 25%);
+}
+.apple-mark::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 1px;
+  width: 6px;
+  height: 4px;
+  border-radius: 6px 0 6px 0;
+  background: #fff;
+  transform: rotate(-35deg);
+}
